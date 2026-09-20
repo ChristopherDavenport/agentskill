@@ -5,7 +5,7 @@ All user-visible changes to this library. The format follows
 uses [Semantic Versioning](https://semver.org/); before v1.0.0 minor
 versions may break the API.
 
-## Unreleased
+## v0.0.2 - 2026-09-20
 
 - Removed: the `instructions` package. The AGENTS.md convention is now
   the separate module
