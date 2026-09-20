@@ -14,10 +14,9 @@ const (
 	agentturnPkg = "github.com/ChristopherDavenport/agentturn"
 )
 
-// TestImportBoundary enforces the module's dependency rules: the root
+// TestImportBoundary enforces the module's dependency rules: the
 // package imports openresponses, agenttool, the YAML parser and the
-// standard library only; agentturn appears in test files alone; and
-// the instructions package imports the standard library alone.
+// standard library only, and agentturn appears in test files alone.
 func TestImportBoundary(t *testing.T) {
 	root, err := build.Default.ImportDir(".", 0)
 	if err != nil {
@@ -40,21 +39,6 @@ func TestImportBoundary(t *testing.T) {
 			// The tool's integration test drives the loop.
 		default:
 			t.Errorf("agentskill tests import %q; that is not an allowed test dependency", imp)
-		}
-	}
-
-	instr, err := build.Default.ImportDir("instructions", 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, imp := range instr.Imports {
-		if !isStandard(imp) {
-			t.Errorf("instructions imports %q; only the standard library is allowed", imp)
-		}
-	}
-	for _, imp := range append(instr.TestImports, instr.XTestImports...) {
-		if !isStandard(imp) && !strings.HasPrefix(imp, modulePath+"/instructions") {
-			t.Errorf("instructions tests import %q; only the standard library is allowed", imp)
 		}
 	}
 }

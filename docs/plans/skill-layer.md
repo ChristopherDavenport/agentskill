@@ -1,21 +1,21 @@
 # Plan: skill layer
 
-Instructions on disk, loaded into the model's context: the
-[Agent Skills](https://agentskills.io/specification) format and the
-[AGENTS.md](https://agents.md/) convention. A product built on
-`agentturn` needs both, the agent-layer plan places them outside the
-loop ("skills or prompt context through `Transform`" under *What a
-product adds*), and the dex plan buries them in its `prompt/` piece.
-This module lifts them out so every product shares one implementation,
-the way `agenttool` was lifted out of the loop.
+The [Agent Skills](https://agentskills.io/specification) format,
+loaded into the model's context. A product built on `agentturn` needs
+it, the agent-layer plan places it outside the loop ("skills or prompt
+context through `Transform`" under *What a product adds*), and the dex
+plan buries it in its `prompt/` piece. This module lifts it out so
+every product shares one implementation, the way `agenttool` was
+lifted out of the loop.
 
-The two formats carry different weight. Agent Skills is a specification
-with a reference validator and exact rules for names, descriptions and
-directory layout; it is the root package. AGENTS.md is plain Markdown
-with one discovery rule and no format; it is a small nested package.
-Both produce text that lands in `agentturn.Config.Instructions`, which
-`agentsession` records in the config entry, so a replayed session shows
-exactly which skills and instruction files the model was given.
+Agent Skills is a specification with a reference validator and exact
+rules for names, descriptions and directory layout, and this module
+follows it to the byte. What it renders lands in
+`agentturn.Config.Instructions`, which `agentsession` records in the
+config entry, so a replayed session shows exactly which skills the
+model was given. The AGENTS.md convention, loaded up front rather
+than on use, is the sibling module `agentsmd`; it lived here as the
+`instructions` subpackage until v0.0.2.
 
 A skill is a tree of files, and "on disk" is only the common case. The
 module reads skills through `fs.FS`, so a skill can come from a
@@ -38,8 +38,6 @@ rather than through a local read tool that may not exist.
   `agenttool.Tool`: metadata in the instructions, the body and the
   resource files through the tool. A product's own file tools are an
   alternative for local skills, never a requirement.
-- Discover AGENTS.md files from a directory to the root, nearest last,
-  and render them as pi renders `<project_context>`.
 - Standard library plus `openresponses`, `agenttool` and one YAML
   parser. Nothing else. `agentturn` is never imported.
 
@@ -55,8 +53,6 @@ rather than through a local read tool that may not exist.
   is a shell tool's job, on a product that has one.
 - A permission system. `allowed-tools` is parsed into rules the host
   can match a call against; enforcement is the host's `BeforeToolCall`.
-- Imports inside instruction files (`@path` in CLAUDE.md). AGENTS.md
-  has none. A product that wants them expands them before rendering.
 - Prompt templates, slash commands, `SYSTEM.md` and `APPEND_SYSTEM.md`.
   Those are the product's prompt builder, which composes this module's
   output.
@@ -68,7 +64,6 @@ Separate module, `github.com/ChristopherDavenport/agentskill`.
 
 ```
 agentskill/                  Skill, Parse, Load, Validate, Discover, Catalog, prompt rendering, the skill tool
-agentskill/instructions      AGENTS.md discovery and rendering (standard library only)
 agentskill/cmd/agentskill    validate, read-properties, to-prompt; mirrors the skills-ref CLI
 ```
 
@@ -76,9 +71,7 @@ The root module depends on `openresponses`, `agenttool` and
 `go.yaml.in/yaml/v3`. The YAML dependency is deliberate: frontmatter is
 YAML, the standard library has no parser, and real skills use quoted,
 folded and multi-line scalars that a hand-rolled subset would reject.
-`make deps` allows exactly these three. `instructions` imports the
-standard library alone and a test enforces it, so a product that wants
-only AGENTS.md pays for nothing else.
+`make deps` allows exactly these three.
 
 The dependency direction is `agentskill -> agenttool -> openresponses`.
 `agentturn` never imports this module; a product wires the two
@@ -298,70 +291,16 @@ outside parentheses, so the specifier is passed through untouched, and
 matches on the tool name; a host wires `Rules` into `BeforeToolCall`
 however it likes.
 
-### `instructions`
+### AGENTS.md
 
-```go
-// Chain returns the instruction files that apply at path: in path's
-// directory and each of its ancestors up to Root, the first file of
-// Names that exists, farthest first and nearest last, followed by
-// Extra in order, within Budget. With nearest last, later text
-// refines earlier text, which is how the convention's "closest file
-// takes precedence" reads when a product includes every file, as pi
-// and Claude Code do. A file found and not included is reported.
-func Chain(path string, opts Options) (Result, error)
-
-type Options struct {
-    Names    []string // tried in order per directory, first found wins; default: AGENTS.md
-    Root     string   // stop after this directory; default: the filesystem root
-    Extra    []string // explicit paths appended last, such as ~/.dex/AGENTS.md; missing ones are skipped
-    MaxBytes int64    // per file that is included; default 1 MiB, a larger one is an error
-    Budget   int64    // total; the first file that would exceed it ends the chain, without error; default: none
-}
-
-type Result struct {
-    Files   []File    // included, in order
-    Omitted []Omitted // found and left out, in the order met
-}
-
-type File struct {
-    Path    string // absolute
-    Content string // verbatim
-}
-
-type Omitted struct {
-    Path   string // absolute
-    Size   int64
-    Reason Reason // OverBudget or Shadowed
-    By     string // the file that stood in for it, for Shadowed
-}
-
-// Render wraps the files as pi does: one <project_instructions
-// path="..."> per file inside <project_context>, in order.
-func Render(files []File) string
-```
-
-`Chain` takes a path rather than a cwd so one call serves both the
-session's working directory and the file a tool is about to touch in a
-monorepo. `Names` is a preference order and yields at most one file
-per directory, as Codex reads `AGENTS.override.md` before `AGENTS.md`,
-so a developer can shadow a committed file without deleting it, and
-dex can let `CLAUDE.md` stand in where `AGENTS.md` is absent; the
-package knows no name specially. `Budget` caps the total, the way the
-reference's `project_doc_max_bytes` does: the first file that would
-exceed it, and everything after it, is left out and `Chain` returns
-what fits without error, so a large file deep in a tree degrades the
-prompt rather than failing the run. No file is cut short, because a
-half instruction file is a worse instruction than none; `MaxBytes`
-stays a per-file error for a file that would be included and could
-never fit. Neither omission is silent: `Result.Omitted` names every
-file `Chain` found and left out, with its size and why, so a product
-can tell the user that a rule file was shadowed or did not fit, and
-the session can record what the model was not given as well as what
-it was. Only a file that is included is read; a shadowed or
-over-budget file is stat'd for its size and left alone. This package
-stays on the local file system: the convention is about a repository
-checkout, and a product with a remote checkout hands the files to
-`Render` itself.
+Not here. The AGENTS.md convention was this module's `instructions`
+subpackage until v0.0.2 and is now the sibling module
+[`agentsmd`](https://github.com/ChristopherDavenport/agentsmd), with
+its own plan. A skill is loaded on use, its body reaching the model
+through the tool when a task matches; AGENTS.md is loaded up front,
+every applicable file in the prompt before the first turn. They share
+nothing but the field they land in, and nobody looking for the second
+expects to find it in a skills module.
 
 ## Invariants
 
@@ -378,7 +317,6 @@ checkout, and a product with a remote checkout hands the files to
   for `Dir`, symlinks resolved.
 - Everything the tool returns is bytes from the source, framed, never
   transformed.
-- `instructions` imports the standard library only.
 
 ## Testing
 
@@ -389,9 +327,7 @@ golden `validate` and `to-prompt` outputs, regenerated with `go test .
 and `fstest.MapFS` to prove no code path assumes a disk. The tool is
 tested against the fixtures for the body call, a text file, an image, a
 refused binary, a refused oversize file and the two unknown-name and
-unknown-path errors. `testdata/instructions/` is a fixture tree with
-files at several depths, a directory holding both `AGENTS.md` and
-`AGENTS.override.md`, and a symlink.
+unknown-path errors.
 
 `make interop` runs the `skills-ref` CLI over the same fixtures and
 diffs its `validate` and `to-prompt` output against ours. It needs
@@ -411,10 +347,8 @@ MCP interop is not.
    errors. Then a run under `agentturn` with the `echo` adapter in a
    test that lives here and imports the loop as a test dependency
    only, over an `embed.FS` source so the run touches no disk.
-5. `instructions`: `Chain`, `Render`, the standard-library boundary
-   test.
-6. dex's `prompt/` piece consumes both packages; its golden prompt test
-   covers the wiring.
+5. dex's `prompt/` piece consumes this module and `agentsmd`; its
+   golden prompt test covers the wiring.
 
 ## Open questions
 
@@ -434,31 +368,25 @@ Open:
   this repository as a nested module, the way `mcpclient` sits in
   `agenttool`, or in the product. Nothing here needs it; reopen when
   a second product wants the same adapter.
-- Whether `instructions` should also find files below the path, for a
-  product that wants a subtree's rules before it edits inside it.
-  `Chain` on the target file covers the case the convention describes;
-  reopen if a product wants a whole-tree index.
 - The YAML dependency. `go.yaml.in/yaml/v3` is the maintained
   successor of `gopkg.in/yaml.v3`. If a standard-library subset proves
   enough across the fixtures and a corpus of published skills, the
   dependency can be dropped in a minor version without an API change.
 - Provenance of what the model was shown. The rendered skill block
-  and the instruction chain land in `Config.Instructions` as text, so
-  the session's config entry records what the model read but not
-  where each piece came from or which version it was. Two additions
-  would close that: a `Manifest` on `Catalog` and on the
-  `instructions` chain listing each source, each skill or file, its
-  location and a SHA-256 of its bytes (the body and every resource
-  for a skill, so a changed reference file changes the hash); and a
-  place for it in the session, most likely an `agentskill:` slug
-  under the config entry's extension keys or a `RequestExtra` value,
-  so `agentsession` stores it without learning the type. With that, a
-  replay can say "this run had `pdf-processing` at hash `ab12…` from
-  `~/.dex/skills`" and an evaluation can group trajectories by skill
-  version. Open because it touches the session format: whether the
-  RFC needs a named field or the passthrough is enough, and whether
-  the hash covers the whole tree or the body alone, is decided with
-  `agentsession` once milestone 2 shows what the manifest holds.
-  On the `instructions` side, `Result` is already the record of what
-  was found, included and omitted; a manifest would add the hash of
-  each included file to it.
+  lands in `Config.Instructions` as text, so the session's config
+  entry records what the model read but not where each piece came
+  from or which version it was. Two additions would close that: a
+  `Manifest` on `Catalog` listing each source, each skill, its
+  location and a SHA-256 of its bytes (the body and every resource,
+  so a changed reference file changes the hash); and a place for it
+  in the session, most likely an `agentskill:` slug under the config
+  entry's extension keys or a `RequestExtra` value, so `agentsession`
+  stores it without learning the type. With that, a replay can say
+  "this run had `pdf-processing` at hash `ab12…` from `~/.dex/skills`"
+  and an evaluation can group trajectories by skill version. Open
+  because it touches the session format: whether the RFC needs a
+  named field or the passthrough is enough, and whether the hash
+  covers the whole tree or the body alone, is decided with
+  `agentsession` once milestone 2 shows what the manifest holds, and
+  alongside the same question in `agentsmd`, whose `Result` already
+  records what was found, included and omitted.

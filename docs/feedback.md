@@ -10,7 +10,7 @@ is now filed where the discussion belongs:
   `Bash(git add *)` could not parse. Tokens now end at whitespace
   outside parentheses.
 - [#2](https://github.com/ChristopherDavenport/agentskill/issues/2)
-  instructions: `Chain` took every name per directory and capped bytes
+  instructions (now `agentsmd`): `Chain` took every name per directory and capped bytes
   per file. `Names` is now a preference order, one file per directory;
   `Budget` caps the total without error; `Result.Omitted` reports every
   file found and left out.

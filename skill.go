@@ -1,8 +1,8 @@
-// Package agentskill loads, validates and renders instructions for Go
-// agents over Open Responses: the Agent Skills format, read through
-// fs.FS so a skill can live in a directory, an embedded bundle, an
-// archive or an adapter over a remote store, and the skill tool through
-// which the model reads a skill's body and files.
+// Package agentskill loads, validates and renders the Agent Skills
+// format for Go agents over Open Responses, read through fs.FS so a
+// skill can live in a directory, an embedded bundle, an archive or an
+// adapter over a remote store, with the skill tool through which the
+// model reads a skill's body and files.
 //
 // A [Skill] is one skill directory, loaded byte for byte: the parsed
 // frontmatter, the Markdown body and the tree of resource files. [Load]
@@ -16,8 +16,8 @@
 // The package depends on openresponses, agenttool, one YAML parser and
 // the standard library. The agent loop is never imported; a product
 // wires the rendered prompt and the tool into its configuration. The
-// nested instructions package handles the AGENTS.md convention and
-// imports the standard library alone.
+// AGENTS.md convention, loaded up front rather than on use, is the
+// separate agentsmd module.
 package agentskill
 
 import (

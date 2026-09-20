@@ -5,6 +5,15 @@ All user-visible changes to this library. The format follows
 uses [Semantic Versioning](https://semver.org/); before v1.0.0 minor
 versions may break the API.
 
+## Unreleased
+
+- Removed: the `instructions` package. The AGENTS.md convention is now
+  the separate module
+  [`github.com/ChristopherDavenport/agentsmd`](https://github.com/ChristopherDavenport/agentsmd),
+  whose v0.0.1 carries the package as it stood here, renamed
+  `agentsmd`. Skills load on use and AGENTS.md loads up front; they are
+  two concepts, and this module is named for the first.
+
 ## v0.0.1 - 2026-09-20
 
 - Initial release: `Parse`, `Encode`, `Load`, `LoadDir` and `Validate`

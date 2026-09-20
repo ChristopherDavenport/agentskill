@@ -1,10 +1,12 @@
 # agentskill
 
-Instructions for Go agents over Open Responses: the
-[Agent Skills](https://agentskills.io/specification) format and the
-[AGENTS.md](https://agents.md/) convention, loaded, validated and
-rendered into the text a product puts in its instructions, plus the
-`skill` tool through which the model reads a skill's body and files.
+The [Agent Skills](https://agentskills.io/specification) format for Go
+agents over Open Responses: skills loaded, validated and rendered into
+the text a product puts in its instructions, plus the `skill` tool
+through which the model reads a skill's body and files. The
+[AGENTS.md](https://agents.md/) convention, loaded up front rather
+than on use, is the separate
+[agentsmd](https://github.com/ChristopherDavenport/agentsmd) module.
 
 A skill is read through `fs.FS`, so it can come from a directory, an
 embedded bundle, an archive or an adapter over a remote store, and the
@@ -50,16 +52,6 @@ image part.
   `allowed-tools`; enforcement is the host's.
 - `Encode` writes a skill back; `Parse(Encode(s))` yields `s`.
 
-## Instructions
-
-The `instructions` package imports the standard library alone.
-`Chain(path, opts)` finds the AGENTS.md files that apply at a path,
-one per directory, farthest first and nearest last, within an optional
-byte budget; its `Result` holds the files and every file it found and
-left out, shadowed or over budget, so nothing the model was not given
-goes unrecorded. `Render` wraps the files as pi renders
-`<project_context>`.
-
 ## CLI
 
 `go run ./cmd/agentskill` mirrors the reference CLI: `validate`,
@@ -74,4 +66,4 @@ make interop  # needs uvx and the network
 ```
 
 Golden outputs live under `testdata/golden`; regenerate with `go test
-. ./instructions -update` and review the diff.
+. -update` and review the diff.

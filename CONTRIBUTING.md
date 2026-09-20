@@ -4,10 +4,11 @@ Issues and pull requests are welcome.
 
 ## Before you start
 
-This library reads, validates and renders instructions; it does not
-decide where skills live, fetch anything, run scripts or enforce
+This library reads, validates and renders skills; it does not decide
+where skills live, fetch anything, run scripts or enforce
 `allowed-tools`. A change that needs a transport, a permission model
-or the agent loop belongs in the product or in a sibling module.
+or the agent loop belongs in the product or in a sibling module, and
+the AGENTS.md convention is the sibling `agentsmd`.
 `docs/plans/skill-layer.md` is the design; read it first.
 
 For anything larger than a bug fix, open an issue first so the shape of
@@ -24,8 +25,7 @@ make check        # gofmt, tidy, vet, deps, staticcheck, govulncheck, race tests
 The module depends on `openresponses`, `agenttool`, `go.yaml.in/yaml/v3`
 and the standard library; `make deps` fails if anything else creeps
 in. `agentturn` is a test dependency of the tool's integration test
-and nothing more. The `instructions` package imports the standard
-library alone, and a test enforces both rules.
+and nothing more; a test enforces both rules.
 
 Interoperability with the reference implementation is checked by
 running the `skills-ref` CLI over the fixtures:
@@ -34,9 +34,9 @@ running the `skills-ref` CLI over the fixtures:
 make interop      # needs uvx and the network
 ```
 
-Fixtures live under `testdata/skills` and `testdata/instructions` with
-golden outputs under `testdata/golden`; regenerate them with `go test
-. ./instructions -update` and review the diff. A fixture used by the
+Fixtures live under `testdata/skills` with golden outputs under
+`testdata/golden`; regenerate them with `go test . -update` and review
+the diff. A fixture used by the
 interop diff must produce the same output from both CLIs; a case where
 this module differs by design is listed in `TestInterop`.
 
