@@ -1,0 +1,3 @@
+error: Skill name cannot start or end with a hyphen
+error: Skill name cannot contain consecutive hyphens
+error: Directory name 'bad-hyphens' must match skill name '-bad--hyphens-'

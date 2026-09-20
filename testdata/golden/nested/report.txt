@@ -1,0 +1,1 @@
+error: Field 'metadata' value for 'tags' must be a string

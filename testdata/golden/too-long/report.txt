@@ -1,0 +1,2 @@
+error: Description exceeds 1024 character limit (1030 chars)
+error: Compatibility exceeds 500 character limit (510 chars)

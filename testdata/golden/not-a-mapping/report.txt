@@ -1,0 +1,1 @@
+load error: SKILL.md frontmatter must be a YAML mapping

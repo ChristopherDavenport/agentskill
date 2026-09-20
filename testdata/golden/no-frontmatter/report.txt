@@ -1,0 +1,1 @@
+load error: SKILL.md must start with YAML frontmatter (---)

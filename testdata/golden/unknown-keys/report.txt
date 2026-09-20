@@ -1,0 +1,1 @@
+error: Unexpected fields in frontmatter: author, version. Only ['allowed-tools', 'compatibility', 'description', 'license', 'metadata', 'name'] are allowed.

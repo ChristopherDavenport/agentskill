@@ -1,0 +1,6 @@
+valid
+file: assets/blob.bin
+file: assets/logo.png
+file: assets/notes
+file: reference.md
+file: scripts/extract.py

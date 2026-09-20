@@ -1,0 +1,2 @@
+error: Field 'name' must be a non-empty string
+error: Field 'description' must be a non-empty string

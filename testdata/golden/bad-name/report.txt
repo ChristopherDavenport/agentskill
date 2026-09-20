@@ -1,0 +1,3 @@
+error: Skill name 'Bad_Name' must be lowercase
+error: Skill name 'Bad_Name' contains invalid characters. Only letters, digits, and hyphens are allowed.
+error: Directory name 'bad-name' must match skill name 'Bad_Name'

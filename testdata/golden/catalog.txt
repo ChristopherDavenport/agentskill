@@ -1,0 +1,166 @@
+<available_skills>
+<skill>
+<name>
+allowed-tools-spaces
+</name>
+<description>
+Pre-approves git commands with the documented allowed-tools syntax, whose specifiers hold spaces and parentheses.
+</description>
+<location>
+<skills>/allowed-tools-spaces/SKILL.md
+</location>
+</skill>
+<skill>
+<name>
+-bad--hyphens-
+</name>
+<description>
+A name with leading, trailing and doubled hyphens.
+</description>
+<location>
+<skills>/bad-hyphens/SKILL.md
+</location>
+</skill>
+<skill>
+<name>
+Bad_Name
+</name>
+<description>
+A name with uppercase and an underscore.
+</description>
+<location>
+<skills>/bad-name/SKILL.md
+</location>
+</skill>
+<skill>
+<name>
+
+</name>
+<description>
+
+</description>
+<location>
+<skills>/empty-fields/SKILL.md
+</location>
+</skill>
+<skill>
+<name>
+folded-description
+</name>
+<description>
+A description written as a folded scalar that spans two source lines and ends with a colon: here.
+</description>
+<location>
+<skills>/folded-description/SKILL.md
+</location>
+</skill>
+<skill>
+<name>
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+</name>
+<description>
+A name over the limit.
+</description>
+<location>
+<skills>/long-name/SKILL.md
+</location>
+</skill>
+<skill>
+<name>
+lowercase-skill-md
+</name>
+<description>
+Uses the lowercase file name.
+</description>
+<location>
+<skills>/lowercase-skill-md/skill.md
+</location>
+</skill>
+<skill>
+<name>
+minimal
+</name>
+<description>
+The smallest valid skill.
+</description>
+<location>
+<skills>/minimal/SKILL.md
+</location>
+</skill>
+<skill>
+<name>
+missing-description
+</name>
+<description>
+
+</description>
+<location>
+<skills>/missing-description/SKILL.md
+</location>
+</skill>
+<skill>
+<name>
+nested
+</name>
+<description>
+Uses a nested metadata value, which the specification forbids.
+</description>
+<location>
+<skills>/nested/SKILL.md
+</location>
+</skill>
+<skill>
+<name>
+pdf-processing
+</name>
+<description>
+Extract text and tables from PDF files, fill forms, merge documents. Use when a task mentions PDFs or .pdf files.
+</description>
+<location>
+<skills>/pdf-processing/SKILL.md
+</location>
+</skill>
+<skill>
+<name>
+too-long
+</name>
+<description>
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+</description>
+<location>
+<skills>/too-long/SKILL.md
+</location>
+</skill>
+<skill>
+<name>
+unknown-keys
+</name>
+<description>
+Carries keys the specification does not define.
+</description>
+<location>
+<skills>/unknown-keys/SKILL.md
+</location>
+</skill>
+</available_skills>
+
+problems:
+bad-hyphens/SKILL.md: error: Skill name cannot start or end with a hyphen
+bad-hyphens/SKILL.md: error: Skill name cannot contain consecutive hyphens
+bad-hyphens/SKILL.md: error: Directory name 'bad-hyphens' must match skill name '-bad--hyphens-'
+bad-name/SKILL.md: error: Skill name 'Bad_Name' must be lowercase
+bad-name/SKILL.md: error: Skill name 'Bad_Name' contains invalid characters. Only letters, digits, and hyphens are allowed.
+bad-name/SKILL.md: error: Directory name 'bad-name' must match skill name 'Bad_Name'
+empty-fields/SKILL.md: error: Field 'name' must be a non-empty string
+empty-fields/SKILL.md: error: Field 'description' must be a non-empty string
+invalid-yaml/SKILL.md: error: Invalid YAML in frontmatter: yaml: line 2: found unexpected end of stream
+long-name/SKILL.md: error: Skill name 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' exceeds 64 character limit (70 chars)
+long-name/SKILL.md: error: Directory name 'long-name' must match skill name 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+missing-description/SKILL.md: error: Missing required field in frontmatter: description
+nested/SKILL.md: error: Field 'metadata' value for 'tags' must be a string
+no-frontmatter/SKILL.md: error: SKILL.md must start with YAML frontmatter (---)
+not-a-mapping/SKILL.md: error: SKILL.md frontmatter must be a YAML mapping
+too-long/SKILL.md: error: Description exceeds 1024 character limit (1030 chars)
+too-long/SKILL.md: error: Compatibility exceeds 500 character limit (510 chars)
+unclosed/SKILL.md: error: SKILL.md frontmatter not properly closed with ---
+unknown-keys/SKILL.md: error: Unexpected fields in frontmatter: author, version. Only ['allowed-tools', 'compatibility', 'description', 'license', 'metadata', 'name'] are allowed.
