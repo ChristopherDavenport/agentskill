@@ -5,7 +5,7 @@ All user-visible changes to this library. The format follows
 uses [Semantic Versioning](https://semver.org/); before v1.0.0 minor
 versions may break the API.
 
-## Unreleased
+## v0.0.1 - 2026-09-20
 
 - Initial release: `Parse`, `Encode`, `Load`, `LoadDir` and `Validate`
   for the Agent Skills format, with the reference validator's verdicts;
