@@ -14,7 +14,8 @@ import (
 type ToolRule struct {
 	Tool string
 	// Spec is the text inside the parentheses, "" when the token has
-	// none.
+	// no parentheses at all. A token whose parentheses are empty does
+	// not parse; see [Skill.Rules].
 	Spec string
 }
 
@@ -35,6 +36,13 @@ func (r ToolRule) Matches(toolName string) bool { return r.Tool == toolName }
 // spaces; unbalanced parentheses are an error, because the token
 // cannot then be delimited. An empty field yields no rules and no
 // error.
+//
+// A token that opens a specifier and supplies none, "Bash()", or whose
+// specifier is the bare carve-out "Bash(!)", is an error rather than a
+// rule, as agentpolicy's parser of the same grammar refuses both. An
+// empty specifier would otherwise be indistinguishable from the bare
+// token "Bash", which grants every call of the tool, so the narrowest
+// thing a skill can write would arrive as the widest grant there is.
 func (s *Skill) Rules() ([]ToolRule, error) {
 	tokens, err := splitRules(s.AllowedTools)
 	if err != nil {
@@ -119,7 +127,14 @@ func parseRule(tok string) (ToolRule, error) {
 				if i != len(tok)-1 {
 					return ToolRule{}, fmt.Errorf("allowed-tools token %q: text after the specifier", tok)
 				}
-				return ToolRule{Tool: tok[:open], Spec: tok[open+1 : i]}, nil
+				spec := tok[open+1 : i]
+				switch spec {
+				case "":
+					return ToolRule{}, fmt.Errorf("allowed-tools token %q: empty specifier", tok)
+				case "!":
+					return ToolRule{}, fmt.Errorf("allowed-tools token %q: empty carve-out", tok)
+				}
+				return ToolRule{Tool: tok[:open], Spec: spec}, nil
 			}
 		}
 	}

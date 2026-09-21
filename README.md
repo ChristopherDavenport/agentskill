@@ -49,7 +49,9 @@ image part.
   `os.DirFS` lacks: a symlink resolving outside the directory is
   refused.
 - `Files`, `Open` and `Rules` reach a skill's resources and its parsed
-  `allowed-tools`; enforcement is the host's.
+  `allowed-tools`; enforcement is the host's. A token that opens a
+  specifier and supplies none, `Bash()`, is refused rather than parsed
+  as the bare `Bash`, which grants every call of the tool.
 - `Encode` writes a skill back; `Parse(Encode(s))` yields `s`.
 
 ## CLI

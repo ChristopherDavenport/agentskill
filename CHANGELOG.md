@@ -5,6 +5,19 @@ All user-visible changes to this library. The format follows
 uses [Semantic Versioning](https://semver.org/); before v1.0.0 minor
 versions may break the API.
 
+## Unreleased
+
+- Security, **Breaking**: `Skill.Rules` refuses a token that opens a
+  specifier and supplies none, `Bash()`, and the bare carve-out
+  `Bash(!)`, as `agentpolicy`'s parser of the same grammar refuses
+  both. An empty specifier used to parse as `{Tool: "Bash", Spec: ""}`,
+  which is indistinguishable from the bare token `Bash` and, crossing
+  to a policy, matches every call of the tool: the narrowest-looking
+  thing a skill can write arrived as the widest grant there is. Both
+  tokens are now an error from `Rules` and an error-severity `Problem`
+  on the `allowed-tools` field, naming the token. The reference
+  validator still accepts them, so this is a deliberate divergence.
+
 ## v0.0.2 - 2026-09-20
 
 - Removed: the `instructions` package. The AGENTS.md convention is now
