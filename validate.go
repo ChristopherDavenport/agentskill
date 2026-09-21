@@ -26,6 +26,12 @@ const (
 // that do not parse, and a body over [MaxBodyLines] lines, which is a
 // [Warning]. A nil result means the skill is valid.
 //
+// The verdicts and their wording are the reference validator's over
+// the frontmatter both readers parse. Three classes of input fall
+// outside that: Unicode normalisation, the YAML dialect, and an empty
+// allowed-tools specifier, which [Skill.Rules] refuses and the
+// reference accepts. The README names all three.
+//
 // Name length is counted in characters, not bytes. The directory match
 // is a plain comparison; the reference validator normalises both sides
 // to NFKC first, which the standard library cannot do, so a name and

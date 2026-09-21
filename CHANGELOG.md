@@ -45,6 +45,13 @@ versions may break the API.
   things; there is no correct value to load, so the file does not load
   at all.
 
+- Documentation: the README bounds the conformance claim and names the
+  three classes of input outside it, the YAML dialect, Unicode
+  normalisation and an empty `allowed-tools` specifier, saying which
+  way each parts; `Validate`'s doc comment says the same in one
+  sentence. The fixture tree and the reference CLI's output over it are
+  under `testdata/ref`, and the tests hold both claims to it.
+
 ## v0.0.2 - 2026-09-20
 
 - Removed: the `instructions` package. The AGENTS.md convention is now

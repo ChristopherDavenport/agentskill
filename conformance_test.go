@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"sort"
 	"strings"
 	"testing"
 
@@ -205,5 +207,115 @@ func TestDuplicateFrontmatterKeyRefused(t *testing.T) {
 		if skill.Location == loc {
 			t.Error("a file with a duplicate key is in Skills")
 		}
+	}
+}
+
+// ourVerdict is this module's error-severity messages for one fixture
+// directory, in the shape the reference prints: a load failure is its
+// one message, and a skill with nothing wrong is "valid".
+func ourVerdict(t *testing.T, dir string) []string {
+	t.Helper()
+	s, err := LoadDir(dir)
+	if err != nil {
+		return []string{err.Error()}
+	}
+	var out []string
+	for _, p := range s.Validate() {
+		if p.Severity == Error {
+			out = append(out, p.Message)
+		}
+	}
+	if len(out) == 0 {
+		return []string{"valid"}
+	}
+	return out
+}
+
+// TestValidateVerdictsMatchReference pins the README's claim that
+// Validate reports the reference validator's verdicts and wording:
+// over the rules of the specification, every fixture's verdict is
+// message for message what skills-ref 0.1.1 printed, except the one
+// divergence the README names. A new divergence fails here.
+//
+// The YAML dialect is a separate capture, compared on the verdict
+// alone, because there the message text is the parser's own; see
+// TestYAMLDialectBounds.
+func TestValidateVerdictsMatchReference(t *testing.T) {
+	base, _, _ := refDirs(t)
+	// The reason the listed fixture is allowed to differ; every other
+	// fixture must agree message for message.
+	diverges := map[string]string{
+		"project/wide-open": "an empty allowed-tools specifier is refused here and accepted there, deliberately",
+	}
+	ref := refVerdicts(t, "ref-validate.txt", base)
+	if len(ref) != 12 {
+		t.Fatalf("the capture holds %d fixtures, want 12", len(ref))
+	}
+	for dir, want := range ref {
+		t.Run(dir, func(t *testing.T) {
+			if len(want) == 0 {
+				want = []string{"valid"}
+			}
+			got := ourVerdict(t, filepath.Join(base, filepath.FromSlash(dir)))
+			agree := sameVerdicts(got, want)
+			why, listed := diverges[dir]
+			switch {
+			case agree && listed:
+				t.Errorf("%s now agrees with the reference; drop it from the divergence list", dir)
+			case agree:
+			case listed:
+				t.Logf("diverges by design (%s)\n  ours: %s\n  ref:  %s", why, strings.Join(got, " | "), strings.Join(want, " | "))
+			default:
+				t.Errorf("verdicts differ and the divergence is not one the README names\n  ours: %s\n  ref:  %s",
+					strings.Join(got, " | "), strings.Join(want, " | "))
+			}
+		})
+	}
+}
+
+// sameVerdicts compares two sets of messages, order aside.
+func sameVerdicts(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	x, y := append([]string(nil), a...), append([]string(nil), b...)
+	sort.Strings(x)
+	sort.Strings(y)
+	return slices.Equal(x, y)
+}
+
+// TestYAMLDialectBounds records where the two readers part over the
+// YAML they accept, which is the class of input the README's
+// conformance claim excludes: the reference's strictyaml forbids flow
+// style, anchors and aliases where go.yaml.in/yaml/v3 allows them, and
+// the reference normalises to NFKC where this module compares as
+// written. Only the verdict is compared, because the message text on
+// either side is its own parser's. The duplicate key used to be in
+// this class and is not any more; anchored agrees by accident, the
+// reference refusing the anchor and this module the shape of the value
+// the alias resolved to.
+func TestYAMLDialectBounds(t *testing.T) {
+	base, _, _ := refDirs(t)
+	ref := refVerdicts(t, "ref-validate-yaml.txt", base)
+	tests := []struct {
+		dir      string
+		ours     bool // does this module accept the file?
+		refTakes bool // does the reference?
+	}{
+		{dir: "yaml/file-tools", ours: false, refTakes: true},
+		{dir: "yaml/flow-metadata", ours: true, refTakes: false},
+		{dir: "yaml/anchored", ours: false, refTakes: false},
+		{dir: "yaml/duplicate-key", ours: false, refTakes: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.dir, func(t *testing.T) {
+			got := sameVerdicts(ourVerdict(t, filepath.Join(base, filepath.FromSlash(tt.dir))), []string{"valid"})
+			if got != tt.ours {
+				t.Errorf("this module accepts %s = %v, want %v", tt.dir, got, tt.ours)
+			}
+			if refOK := len(ref[tt.dir]) == 0; refOK != tt.refTakes {
+				t.Errorf("skills-ref accepts %s = %v, want %v", tt.dir, refOK, tt.refTakes)
+			}
+		})
 	}
 }
