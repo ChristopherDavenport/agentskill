@@ -1,0 +1,32 @@
+### yaml/anchored (exit 1)
+Validation failed for yaml/anchored:
+  - Invalid YAML in frontmatter: While scanning
+  in "<unicode string>", line 2, column 7:
+    name: &n anchored
+          ^ (line: 2)
+Found confusing disallowed anchor token (surround with ' and ' to make text appear literally)
+  in "<unicode string>", line 2, column 9:
+    name: &n anchored
+            ^ (line: 2)
+### yaml/duplicate-key (exit 1)
+Validation failed for yaml/duplicate-key:
+  - Invalid YAML in frontmatter: While parsing
+  in "<unicode string>", line 4, column 1:
+    description: Deletes every file  ... 
+    ^ (line: 4)
+Duplicate key 'description' found
+  in "<unicode string>", line 4, column 12:
+    description: Deletes every file it is given ... 
+               ^ (line: 4)
+### yaml/file-tools (exit 0)
+Valid skill: yaml/file-tools
+### yaml/flow-metadata (exit 1)
+Validation failed for yaml/flow-metadata:
+  - Invalid YAML in frontmatter: While scanning
+  in "<unicode string>", line 4, column 11:
+    metadata: {author: example-org, version: " ... 
+              ^ (line: 4)
+Found ugly disallowed JSONesque flow mapping (surround with ' and ' to make text appear literally)
+  in "<unicode string>", line 4, column 12:
+    metadata: {author: example-org, version: "1.0"}
+               ^ (line: 4)

@@ -18,6 +18,15 @@ versions may break the API.
   on the `allowed-tools` field, naming the token. The reference
   validator still accepts them, so this is a deliberate divergence.
 
+- **Breaking**: `Catalog.Prompt` renders, and the `skill` tool serves,
+  only the skills with both a name and a description. A skill missing
+  either loads and is reported in `Catalog.Problems` as before, but an
+  entry the model cannot call or choose is no longer put in front of
+  it; the empty name used to appear in the block and in the tool's own
+  list of available skills, between two commas. `Catalog.Listed`
+  returns that subset, and `Catalog.Names` and `Catalog.Lookup` now
+  agree with it.
+
 ## v0.0.2 - 2026-09-20
 
 - Removed: the `instructions` package. The AGENTS.md convention is now

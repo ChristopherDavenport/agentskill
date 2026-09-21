@@ -29,11 +29,14 @@ cfg := agentturn.Config{
 ```
 
 `Prompt` renders the `<available_skills>` block byte for byte as the
-reference `skills-ref to-prompt` does for the same directories. The
-tool serves the other two levels of progressive disclosure: called
-with a name it returns the body and the list of files; called with a
-name and a path it returns the file, text as text and an image as an
-image part.
+reference `skills-ref to-prompt` does for the same directories. It
+renders the skills the model can use: a skill with no name to call it
+by, or no description to choose it from, is loaded and reported in
+`Problems` but is neither listed nor served, since an entry the model
+cannot follow costs tokens on every turn. The tool serves the other
+two levels of progressive disclosure: called with a name it returns
+the body and the list of files; called with a name and a path it
+returns the file, text as text and an image as an image part.
 
 ## Skills
 
@@ -45,6 +48,8 @@ image part.
   with a bad name loads and says what is wrong.
 - `Discover(sources...)` walks each source's direct children; the
   first skill with a given name wins, as PATH resolves a command.
+  `Catalog.Listed` is the subset the prompt renders and the tool
+  serves, and `Lookup` and `Names` agree with it.
 - `Dir(path)` is the source for a local directory, with one guard
   `os.DirFS` lacks: a symlink resolving outside the directory is
   refused.

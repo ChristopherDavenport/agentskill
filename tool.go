@@ -53,6 +53,10 @@ type toolArgs struct {
 //
 // Everything the tool returns is bytes from the source, framed, never
 // transformed, so the transcript records exactly what the model read.
+//
+// The tool serves the skills [Catalog.Listed] offers, which are the
+// ones [Catalog.Prompt] renders, so the model can fetch everything it
+// is shown and nothing it is not.
 func (c *Catalog) Tool(opts ...ToolOption) agenttool.Tool {
 	o := toolOptions{maxBytes: DefaultMaxBytes}
 	for _, opt := range opts {

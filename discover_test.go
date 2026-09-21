@@ -80,8 +80,17 @@ func TestDiscoverBrokenSkillIsListed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := c.Names(); len(got) != 3 || got[0] != "Wrong" || got[1] != "good" || got[2] != "" {
+	// A skill with a bad name is still offered, as the reference
+	// renders it; one with no name at all is not, because there is
+	// nothing the model could call it.
+	if got := c.Names(); len(got) != 2 || got[0] != "Wrong" || got[1] != "good" {
 		t.Errorf("Names() = %q", got)
+	}
+	if len(c.Skills) != 3 {
+		t.Errorf("Skills = %d, want the nameless skill kept", len(c.Skills))
+	}
+	if p := c.Problems["/src/nameless/SKILL.md"]; len(p) != 1 {
+		t.Errorf("nameless problems = %v, want the missing name reported", p)
 	}
 	if p := c.Problems["/src/broken/SKILL.md"]; len(p) != 1 || p[0].Message != ErrNoFrontmatter.Error() {
 		t.Errorf("broken problems = %v", p)
