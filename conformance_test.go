@@ -319,3 +319,59 @@ func TestYAMLDialectBounds(t *testing.T) {
 		})
 	}
 }
+
+// TestCatalogAccountsForEveryFixture: a skill that is broken, or that
+// lost a name to an earlier source, must be somewhere a product can
+// find it, because saying what is wrong with a skill is why broken
+// ones are loaded at all. Every directory under the two sources that
+// holds a skill file is in Skills, in Shadowed or in Problems, a
+// directory with no skill file is in none of them, and a skill that is
+// both shadowed and broken keeps its problems.
+func TestCatalogAccountsForEveryFixture(t *testing.T) {
+	c, base := refCatalog(t)
+	_, project, user := refDirs(t)
+
+	where := map[string][]string{}
+	for _, s := range c.Skills {
+		where[filepath.Dir(s.Location)] = append(where[filepath.Dir(s.Location)], "Skills")
+	}
+	for _, s := range c.Shadowed {
+		where[filepath.Dir(s.Location)] = append(where[filepath.Dir(s.Location)], "Shadowed")
+	}
+	for loc := range c.Problems {
+		where[filepath.Dir(loc)] = append(where[filepath.Dir(loc)], "Problems")
+	}
+	for _, root := range []string{project, user} {
+		entries, err := os.ReadDir(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			dir := filepath.Join(root, e.Name())
+			_, isSkill := os.Stat(filepath.Join(dir, "SKILL.md"))
+			switch rel := strings.TrimPrefix(dir, base+string(filepath.Separator)); {
+			case isSkill != nil && len(where[dir]) > 0:
+				t.Errorf("%s holds no SKILL.md and is in %s", rel, strings.Join(where[dir], " + "))
+			case isSkill == nil && len(where[dir]) == 0:
+				t.Errorf("%s holds a SKILL.md and is in no list", rel)
+			}
+		}
+	}
+
+	// user/pdf-processing lost the name to the project copy and its
+	// description is over the limit: both facts survive.
+	shadowed := filepath.Join(user, "pdf-processing", "SKILL.md")
+	var found bool
+	for _, s := range c.Shadowed {
+		found = found || s.Location == shadowed
+	}
+	if !found {
+		t.Errorf("Shadowed = %d skills, want the user copy of pdf-processing", len(c.Shadowed))
+	}
+	if len(c.Problems[shadowed]) != 1 {
+		t.Errorf("Problems[user/pdf-processing] = %v, want the description over the limit", c.Problems[shadowed])
+	}
+}
