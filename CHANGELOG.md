@@ -27,6 +27,16 @@ versions may break the API.
   returns that subset, and `Catalog.Names` and `Catalog.Lookup` now
   agree with it.
 
+- Added: the `skill` tool sets a `Read` as its result's `Details`,
+  carrying the skill's name, the `SKILL.md` behind that name, the path
+  served and a sha256 of the bytes served. It implements
+  `agenttool.Recordable` under the exported namespace
+  `agentskill.RecordNS`, so a recorder that knows nothing about skills
+  writes it beside the call: a session can then say which `SKILL.md`
+  was served, where a name alone is whatever discovery resolved to at
+  the time, and a replay that serves different bytes for the same name
+  is detectable. Requires agenttool v0.0.5, where `Recordable` arrived.
+
 ## v0.0.2 - 2026-09-20
 
 - Removed: the `instructions` package. The AGENTS.md convention is now

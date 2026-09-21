@@ -36,7 +36,11 @@ by, or no description to choose it from, is loaded and reported in
 cannot follow costs tokens on every turn. The tool serves the other
 two levels of progressive disclosure: called with a name it returns
 the body and the list of files; called with a name and a path it
-returns the file, text as text and an image as an image part.
+returns the file, text as text and an image as an image part. Each
+read sets a `Read` as the result's `Details`, which a recorder writes
+under `agentskill.RecordNS`: the name, the `SKILL.md` behind it, the
+path served and a sha256 of the bytes, so a session can say which
+skill that was and a replay serving other bytes is detectable.
 
 ## Skills
 

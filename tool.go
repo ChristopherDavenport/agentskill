@@ -3,7 +3,9 @@ package agentskill
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -36,6 +38,40 @@ func WithMaxBytes(n int64) ToolOption {
 	return func(o *toolOptions) { o.maxBytes = n }
 }
 
+// RecordNS is the namespace of the session entry a recorder writes for
+// a skill read, the value [Read.RecordNS] returns.
+const RecordNS = "agentskill:read"
+
+// Read is what the skill tool did, set as the Result.Details of every
+// successful call. It implements agenttool.Recordable, so a recorder
+// that knows nothing about skills writes it beside the call as a
+// namespaced JSON entry, and the session can then say which SKILL.md
+// was served rather than only which name the model wrote.
+//
+// A name is not an identity: it is what a PATH-style search across
+// several sources resolved to at discovery time. Location says which
+// skill won, and SHA256 says what its bytes were, so a replay that
+// serves different bytes for the same name is detectable.
+type Read struct {
+	// Name is the skill's name, as the model wrote it.
+	Name string `json:"name"`
+	// Location is the skill's Location: the SKILL.md that was read.
+	Location string `json:"location"`
+	// Path is the file inside the skill that was served, "" for a read
+	// of the skill's own instructions.
+	Path string `json:"path,omitempty"`
+	// Bytes is the number of bytes served.
+	Bytes int `json:"bytes"`
+	// SHA256 is the hex digest of the bytes served: the text of the
+	// reply for a read of the instructions, and the file's own bytes
+	// for a file, before an image is base64 encoded into its part.
+	SHA256 string `json:"sha256"`
+}
+
+// RecordNS returns [RecordNS], the namespace a recorder writes the
+// read under.
+func (Read) RecordNS() string { return RecordNS }
+
 // toolArgs is the argument object of the skill tool.
 type toolArgs struct {
 	Name string `json:"name" desc:"The skill to read"`
@@ -57,6 +93,11 @@ type toolArgs struct {
 // The tool serves the skills [Catalog.Listed] offers, which are the
 // ones [Catalog.Prompt] renders, so the model can fetch everything it
 // is shown and nothing it is not.
+//
+// Every successful call sets a [Read] as the result's Details, naming
+// the skill, the SKILL.md behind the name and a digest of the bytes
+// served. It implements agenttool.Recordable, so a recorder writes it
+// under [RecordNS]; the model never sees it.
 func (c *Catalog) Tool(opts ...ToolOption) agenttool.Tool {
 	o := toolOptions{maxBytes: DefaultMaxBytes}
 	for _, opt := range opts {
@@ -64,23 +105,43 @@ func (c *Catalog) Tool(opts ...ToolOption) agenttool.Tool {
 	}
 	return agenttool.New(ToolName,
 		"Read a skill's instructions, or one of its files. Call with the skill's name for its instructions and the list of its files; call with a name and a path for a file.",
-		func(ctx context.Context, a toolArgs) (openresponses.Contents, error) {
+		func(ctx context.Context, a toolArgs) (agenttool.Result, error) {
 			s, ok := c.Lookup(a.Name)
 			if !ok {
-				return nil, fmt.Errorf("unknown skill %q; available skills: %s", a.Name, listOrNone(c.Names()))
+				return agenttool.Result{}, fmt.Errorf("unknown skill %q; available skills: %s", a.Name, listOrNone(c.Names()))
 			}
+			var (
+				parts  openresponses.Contents
+				served []byte
+				err    error
+			)
 			if a.Path == "" {
-				return body(s)
+				parts, served, err = body(s)
+			} else {
+				parts, served, err = file(s, a.Path, o.maxBytes)
 			}
-			return file(s, a.Path, o.maxBytes)
+			if err != nil {
+				return agenttool.Result{}, err
+			}
+			sum := sha256.Sum256(served)
+			res := agenttool.Parts(parts...)
+			res.Details = Read{
+				Name:     s.Name,
+				Location: s.Location,
+				Path:     a.Path,
+				Bytes:    len(served),
+				SHA256:   hex.EncodeToString(sum[:]),
+			}
+			return res, nil
 		})
 }
 
-// body renders the skill's Markdown followed by its file list.
-func body(s *Skill) (openresponses.Contents, error) {
+// body renders the skill's Markdown followed by its file list, and
+// returns the bytes served beside the part that carries them.
+func body(s *Skill) (openresponses.Contents, []byte, error) {
 	files, err := s.Files()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var b strings.Builder
 	b.WriteString(s.Body)
@@ -101,43 +162,45 @@ func body(s *Skill) (openresponses.Contents, error) {
 			b.WriteString("\n")
 		}
 	}
-	return openresponses.Contents{&openresponses.InputText{Text: b.String()}}, nil
+	text := b.String()
+	return openresponses.Contents{&openresponses.InputText{Text: text}}, []byte(text), nil
 }
 
-// file returns one resource file as text or an image.
-func file(s *Skill, name string, maxBytes int64) (openresponses.Contents, error) {
+// file returns one resource file as text or an image, with the file's
+// own bytes beside the part.
+func file(s *Skill, name string, maxBytes int64) (openresponses.Contents, []byte, error) {
 	if !fs.ValidPath(name) {
-		return nil, fmt.Errorf("invalid path %q: must be a relative path inside the skill, as listed", name)
+		return nil, nil, fmt.Errorf("invalid path %q: must be a relative path inside the skill, as listed", name)
 	}
 	info, err := fs.Stat(s.FS, name)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) || errors.Is(err, ErrOutside) {
-			return nil, noSuchFile(s, name)
+			return nil, nil, noSuchFile(s, name)
 		}
-		return nil, fmt.Errorf("stat %q: %w", name, err)
+		return nil, nil, fmt.Errorf("stat %q: %w", name, err)
 	}
 	if info.IsDir() {
-		return nil, noSuchFile(s, name)
+		return nil, nil, noSuchFile(s, name)
 	}
 	if info.Size() > maxBytes {
-		return nil, fmt.Errorf("file %q is %d bytes, over the %d byte limit; it is not returned in part", name, info.Size(), maxBytes)
+		return nil, nil, fmt.Errorf("file %q is %d bytes, over the %d byte limit; it is not returned in part", name, info.Size(), maxBytes)
 	}
 	data, err := fs.ReadFile(s.FS, name)
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %w", name, err)
+		return nil, nil, fmt.Errorf("read %q: %w", name, err)
 	}
 	if int64(len(data)) > maxBytes {
-		return nil, fmt.Errorf("file %q is %d bytes, over the %d byte limit; it is not returned in part", name, len(data), maxBytes)
+		return nil, nil, fmt.Errorf("file %q is %d bytes, over the %d byte limit; it is not returned in part", name, len(data), maxBytes)
 	}
 	kind, mediaType := detect(name, data)
 	switch kind {
 	case kindText:
-		return openresponses.Contents{&openresponses.InputText{Text: string(data)}}, nil
+		return openresponses.Contents{&openresponses.InputText{Text: string(data)}}, data, nil
 	case kindImage:
 		url := "data:" + mediaType + ";base64," + base64.StdEncoding.EncodeToString(data)
-		return openresponses.Contents{&openresponses.InputImage{ImageURL: url}}, nil
+		return openresponses.Contents{&openresponses.InputImage{ImageURL: url}}, data, nil
 	}
-	return nil, fmt.Errorf("file %q is %d bytes of %s, which cannot be shown as text or an image", name, len(data), mediaType)
+	return nil, nil, fmt.Errorf("file %q is %d bytes of %s, which cannot be shown as text or an image", name, len(data), mediaType)
 }
 
 func noSuchFile(s *Skill, name string) error {
