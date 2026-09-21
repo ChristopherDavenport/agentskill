@@ -48,8 +48,9 @@ skill that was and a replay serving other bytes is detectable.
   `fs.FS`; `LoadDir` does it for a directory; `Parse` reads bytes.
 - `Validate` reports every rule of the specification as a `Problem`,
   with the reference validator's verdicts and wording, and warns on a
-  body over 500 lines. A malformed file fails to load; a valid file
-  with a bad name loads and says what is wrong.
+  body over 500 lines. A malformed file fails to load, a repeated
+  frontmatter key included; a valid file with a bad name loads and says
+  what is wrong.
 - `Discover(sources...)` walks each source's direct children; the
   first skill with a given name wins, as PATH resolves a command.
   `Catalog.Listed` is the subset the prompt renders and the tool

@@ -71,6 +71,11 @@ func TestParse(t *testing.T) {
 		{name: "unclosed", src: "---\nname: a\n", err: ErrUnclosedFrontmatter},
 		{name: "not a mapping", src: "---\n- a\n---\n", err: ErrNotMapping},
 		{name: "invalid yaml", src: "---\nname: \"x\n---\n", err: errInvalidYAML},
+		// A repeated key is a YAML error, as strictyaml makes it for
+		// the reference reader: there is no correct value to load.
+		{name: "duplicate key", src: "---\nname: a\ndescription: b\ndescription: c\n---\n", err: errInvalidYAML},
+		{name: "duplicate unknown key", src: "---\nname: a\ndescription: b\nversion: 1\nversion: 2\n---\n", err: errInvalidYAML},
+		{name: "duplicate name", src: "---\nname: a\nname: a\ndescription: b\n---\n", err: errInvalidYAML},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

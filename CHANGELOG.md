@@ -37,6 +37,14 @@ versions may break the API.
   the time, and a replay that serves different bytes for the same name
   is detectable. Requires agenttool v0.0.5, where `Recordable` arrived.
 
+- **Breaking**: a repeated frontmatter key is a load error, as
+  `strictyaml` makes it for the reference reader, rather than a silent
+  last-wins. A SKILL.md whose `description` or `allowed-tools` is
+  written twice used to load carrying the second value, so a reviewer
+  reading the diff and the model reading the skill were told different
+  things; there is no correct value to load, so the file does not load
+  at all.
+
 ## v0.0.2 - 2026-09-20
 
 - Removed: the `instructions` package. The AGENTS.md convention is now

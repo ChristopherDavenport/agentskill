@@ -147,3 +147,63 @@ func firstDiff(got, want string) string {
 	}
 	return "no line differs"
 }
+
+// refVerdicts parses a captured validate run into a map from fixture
+// directory to the reference's error messages, empty when it called
+// the skill valid.
+func refVerdicts(t *testing.T, name, base string) map[string][]string {
+	t.Helper()
+	out := map[string][]string{}
+	var cur string
+	for _, line := range strings.Split(refGolden(t, name, base), "\n") {
+		switch {
+		case strings.HasPrefix(line, "### "):
+			cur = strings.Fields(strings.TrimPrefix(line, "### "))[0]
+			out[cur] = nil
+		case strings.HasPrefix(line, "  - "):
+			out[cur] = append(out[cur], strings.TrimPrefix(line, "  - "))
+		}
+	}
+	return out
+}
+
+// TestDuplicateFrontmatterKeyRefused: a key written twice used to load
+// silently with the last value winning, where the reference's
+// strictyaml refuses the file. The two readers of one format then
+// disagreed about what a skill says, not merely about whether it is
+// well formed, and the shape that matters is a first allowed-tools or
+// description line that a reviewer approves and a second that the
+// model is given.
+func TestDuplicateFrontmatterKeyRefused(t *testing.T) {
+	base, _, _ := refDirs(t)
+	dir := filepath.Join(base, "yaml", "duplicate-key")
+
+	s, err := LoadDir(dir)
+	if err == nil {
+		t.Fatalf("loaded a file with two descriptions; the skill carries %q", s.Description)
+	}
+	// The line is counted within the frontmatter, as every other YAML
+	// message from this package is.
+	const want = `Invalid YAML in frontmatter: line 3: duplicate key "description"`
+	if err.Error() != want {
+		t.Errorf("LoadDir() error = %q, want %q", err, want)
+	}
+	if ref := refVerdicts(t, "ref-validate-yaml.txt", base)["yaml/duplicate-key"]; len(ref) == 0 {
+		t.Error("the reference accepts the file; the capture under testdata/ref/golden says it refuses it")
+	}
+
+	// Discovery reports it under its location and offers nothing.
+	c, err := DiscoverDirs(filepath.Join(base, "yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	loc := filepath.Join(dir, "SKILL.md")
+	if p := c.Problems[loc]; len(p) != 1 || p[0].Message != want {
+		t.Errorf("Problems[%s] = %v, want the duplicate key", loc, p)
+	}
+	for _, skill := range c.Skills {
+		if skill.Location == loc {
+			t.Error("a file with a duplicate key is in Skills")
+		}
+	}
+}
