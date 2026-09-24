@@ -40,6 +40,36 @@ the diff. A fixture used by the
 interop diff must produce the same output from both CLIs; a case where
 this module differs by design is listed in `TestInterop`.
 
+## Releases
+
+This repository is a single module, tagged `vX.Y.Z`. With the
+changelog's *Unreleased* section written:
+
+```sh
+make release VERSION=v0.1.0
+```
+
+dates the changelog, runs `make tidy` and `make check`, commits, guards
+and tags the version with the changelog section as the message, and
+pushes the branch and the tag in one atomic push. The release workflow
+publishes a GitHub release from the tag message, and the Go module
+proxy picks the version up. Before v1.0.0 the API may change between
+minor versions; the changelog records every break.
+
+`make release-guard TAG=<tag>` is what stands between a mistake and a
+permanent one, and `make release` runs it before the tag it writes. It
+refuses a dirty tree, a tag that already exists locally or on origin,
+and a version that does not sort above the current release — the one
+mistake nothing can undo, since the proxy and the checksum database
+keep every published version forever. It runs after the release commit
+and before the tag, while everything is still local, so a refusal costs
+a `git reset --hard HEAD~1`.
+
+The sibling repositories with nested modules carry a longer
+`release-guard.sh` that also holds a `<dir>/vX.Y.Z` tag to its module's
+`go.mod`. If a nested module is ever added here, that is the part to
+bring over.
+
 ## Pull requests
 
 - Keep the change focused; unrelated cleanups belong in their own PR.

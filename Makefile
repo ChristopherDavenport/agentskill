@@ -2,7 +2,8 @@ GO ?= go
 STATICCHECK ?= $(GO) run honnef.co/go/tools/cmd/staticcheck@latest
 GOVULNCHECK ?= $(GO) run golang.org/x/vuln/cmd/govulncheck@latest
 
-.PHONY: build deps test vet fmt tidy tidy-check lint vuln check interop release clean
+.PHONY: build deps test vet fmt tidy tidy-check lint vuln check interop \
+	release-guard release clean
 
 build:
 	$(GO) build ./...
@@ -53,12 +54,26 @@ interop:
 	SKILLS_INTEROP=1 $(GO) test -race -count=1 -run TestInterop ./cmd/agentskill
 
 MODULE := $(shell $(GO) list -m)
-NOTES := $(shell mktemp)
+
+# Checks one tag is safe to push, before it is pushed. A pushed tag is
+# permanent — the proxy and the checksum database keep the version
+# forever — so this is the last point at which a mistake is free:
+#   make release-guard TAG=v0.1.0
+release-guard:
+	@test -n "$(TAG)" || { echo "usage: make release-guard TAG=<tag>"; exit 1; }
+	@scripts/release-guard.sh "$(TAG)"
 
 # Cut a release: the changelog's Unreleased section is dated, everything
-# is checked, one commit is made, the root is tagged VERSION with the
-# changelog section as the message, and the branch and tag are pushed.
-# TRAILER, when set, is appended to the commit message.
+# is checked, one commit is made, the tag is guarded and then written
+# with the changelog section as its message, and the branch and tag are
+# pushed. TRAILER, when set, is appended to the commit message.
+#
+# The guard runs after the commit and before the tag, which is the last
+# moment everything is still local: if it refuses, undo with git reset
+# --hard HEAD~1. Nothing is public until the push.
+#
+# --atomic lands the branch and the tag in one transaction, so no window
+# exists in which the tag is visible without the commit it names.
 #
 # The changelog is dated through a temp file rather than sed -i, which is
 # a GNU-ism: BSD sed reads the argument after -i as a backup suffix, so
@@ -75,11 +90,10 @@ release:
 	$(MAKE) tidy
 	$(MAKE) check
 	git add -A && git commit -q -m "Release $(VERSION)" $(if $(TRAILER),-m "$(TRAILER)")
-	@awk -v v="$(VERSION)" '/^## /{p=($$2==v)} p' CHANGELOG.md | sed '1s/.*/$(VERSION)/' > $(NOTES)
-	git tag -a $(VERSION) -F $(NOTES)
-	@rm -f $(NOTES)
-	git push origin HEAD
-	git push origin $(VERSION)
+	@scripts/release-guard.sh "$(VERSION)"
+	@notes="$$(scripts/release-notes.sh $(VERSION))" || exit 1; \
+	 git tag -a $(VERSION) -m "$$notes"
+	git push origin --atomic HEAD $(VERSION)
 
 clean:
 	rm -rf .cache
