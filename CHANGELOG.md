@@ -5,7 +5,7 @@ All user-visible changes to this library. The format follows
 uses [Semantic Versioning](https://semver.org/); before v1.0.0 minor
 versions may break the API.
 
-## Unreleased
+## v0.0.4 - 2026-09-24
 
 - Dependencies: openresponses v0.0.9 to v0.0.12, agenttool v0.0.5 to
   v0.0.7, and agentturn v0.0.5 to v0.0.8, which is used by the tests
