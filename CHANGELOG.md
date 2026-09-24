@@ -61,6 +61,10 @@ versions may break the API.
   sentence. The fixture tree and the reference CLI's output over it are
   under `testdata/ref`, and the tests hold both claims to it.
 
+- Dependencies: openresponses v0.0.9 to v0.0.12, agenttool v0.0.5 to
+  v0.0.7, and agentturn v0.0.5 to v0.0.8, which is used by the tests
+  alone. No API of this module changes with them.
+
 ## v0.0.2 - 2026-09-20
 
 - Removed: the `instructions` package. The AGENTS.md convention is now
