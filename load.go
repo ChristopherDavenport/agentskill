@@ -57,7 +57,38 @@ func LoadDir(dir string) (*Skill, error) {
 	return Load(src.FS, src.Location)
 }
 
+// readSkillFile returns the name of the skill file, as it is spelled at
+// the root of fsys, and its contents.
+//
+// The name is taken from the directory listing rather than from the name
+// the read succeeded under. On a case-insensitive file system — APFS and
+// HFS+ on macOS, NTFS on Windows — reading "SKILL.md" succeeds against a
+// file that is really named "skill.md", and reporting the probe back
+// would put a spelling in Location that does not exist on a
+// case-sensitive host. The listing is exact everywhere.
+//
+// An fs.FS need not implement ReadDir, so a source that cannot be listed
+// falls back to probing; there the probed name is the best available.
 func readSkillFile(fsys fs.FS) (string, []byte, error) {
+	if entries, err := fs.ReadDir(fsys, "."); err == nil {
+		present := make(map[string]bool, len(entries))
+		for _, e := range entries {
+			if !e.IsDir() {
+				present[e.Name()] = true
+			}
+		}
+		for _, name := range skillFiles {
+			if !present[name] {
+				continue
+			}
+			src, err := fs.ReadFile(fsys, name)
+			if err != nil {
+				return "", nil, fmt.Errorf("agentskill: read %s: %w", name, err)
+			}
+			return name, src, nil
+		}
+		return "", nil, ErrNoSkillFile
+	}
 	for _, name := range skillFiles {
 		src, err := fs.ReadFile(fsys, name)
 		if err == nil {

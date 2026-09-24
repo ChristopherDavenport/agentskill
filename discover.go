@@ -119,9 +119,36 @@ func findSkillFile(fsys fs.FS, dir string) (string, bool) {
 	return "", false
 }
 
-// Lookup returns the skill named name, among the winners only.
-func (c *Catalog) Lookup(name string) (*Skill, bool) {
+// Listed returns the skills the model is offered, in catalog order:
+// the winners that have both a name to call them by and a description
+// to choose them from. A skill missing either cannot be used, since
+// the name is the only handle the tool takes and the description is
+// the only thing the model chooses on, so it is left out of
+// [Catalog.Prompt], [Catalog.Names], [Catalog.Lookup] and the tool,
+// as the client implementation guide says to skip it and as the
+// reference's to_prompt refuses to render it.
+//
+// It stays in Skills and its problems stay in Problems, so a product
+// can still list a broken skill and say what is wrong with it, which
+// is why they are loaded at all.
+func (c *Catalog) Listed() []*Skill {
+	listed := make([]*Skill, 0, len(c.Skills))
 	for _, s := range c.Skills {
+		if s.Name == "" || s.Description == "" {
+			continue
+		}
+		listed = append(listed, s)
+	}
+	return listed
+}
+
+// Lookup returns the skill named name, among the skills [Catalog.Listed]
+// offers, so what the model can be served is what the prompt lists.
+func (c *Catalog) Lookup(name string) (*Skill, bool) {
+	if name == "" {
+		return nil, false
+	}
+	for _, s := range c.Listed() {
 		if s.Name == name {
 			return s, true
 		}
@@ -129,10 +156,12 @@ func (c *Catalog) Lookup(name string) (*Skill, bool) {
 	return nil, false
 }
 
-// Names returns the winners' names in catalog order.
+// Names returns the names of the skills [Catalog.Listed] offers, in
+// catalog order.
 func (c *Catalog) Names() []string {
-	names := make([]string, 0, len(c.Skills))
-	for _, s := range c.Skills {
+	listed := c.Listed()
+	names := make([]string, 0, len(listed))
+	for _, s := range listed {
 		names = append(names, s.Name)
 	}
 	return names
@@ -145,10 +174,16 @@ func (c *Catalog) Names() []string {
 // local sources the output is byte for byte what skills-ref to-prompt
 // prints for the same directories. An empty catalog renders the empty
 // block.
+//
+// Only the skills [Catalog.Listed] offers are rendered: an entry the
+// model cannot call, because the skill has no name, or choose, because
+// it has no description, would cost tokens on every turn and offer a
+// pointer that goes nowhere. The reference refuses to render the whole
+// block over such a set; this renders the rest.
 func (c *Catalog) Prompt() string {
 	var b strings.Builder
 	b.WriteString("<available_skills>\n")
-	for _, s := range c.Skills {
+	for _, s := range c.Listed() {
 		b.WriteString("<skill>\n<name>\n")
 		b.WriteString(escape(s.Name))
 		b.WriteString("\n</name>\n<description>\n")

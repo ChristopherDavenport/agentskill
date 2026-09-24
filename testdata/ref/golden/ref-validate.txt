@@ -1,0 +1,33 @@
+### project/bad-name (exit 1)
+Validation failed for project/bad-name:
+  - Skill name 'Bad_Name' must be lowercase
+  - Skill name 'Bad_Name' contains invalid characters. Only letters, digits, and hyphens are allowed.
+  - Directory name 'bad-name' must match skill name 'Bad_Name'
+### project/commit-helper (exit 0)
+Valid skill: project/commit-helper
+### project/data-analysis (exit 0)
+Valid skill: project/data-analysis
+### project/long-description (exit 1)
+Validation failed for project/long-description:
+  - Description exceeds 1024 character limit (1030 chars)
+### project/nameless (exit 1)
+Validation failed for project/nameless:
+  - Field 'name' must be a non-empty string
+  - Field 'description' must be a non-empty string
+### project/no-close (exit 1)
+Validation failed for project/no-close:
+  - SKILL.md frontmatter not properly closed with ---
+### project/notes (exit 1)
+Validation failed for project/notes:
+  - Missing required file: SKILL.md
+### project/pdf-processing (exit 0)
+Valid skill: project/pdf-processing
+### project/wide-open (exit 0)
+Valid skill: project/wide-open
+### user/data-analysis (exit 0)
+Valid skill: user/data-analysis
+### user/summarize (exit 0)
+Valid skill: user/summarize
+### user/pdf-processing (exit 1)
+Validation failed for user/pdf-processing:
+  - Description exceeds 1024 character limit (1030 chars)

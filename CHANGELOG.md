@@ -5,6 +5,62 @@ All user-visible changes to this library. The format follows
 uses [Semantic Versioning](https://semver.org/); before v1.0.0 minor
 versions may break the API.
 
+## Unreleased
+
+- Fixed: `Load` reports the skill file under the spelling it has on
+  disk. The name was taken from the probe that succeeded, and on a
+  case-insensitive file system — APFS and HFS+ on macOS, NTFS on
+  Windows — reading `SKILL.md` succeeds against a file really named
+  `skill.md`, so `Skill.Location` named a path that does not exist on a
+  case-sensitive host. The spelling now comes from the directory
+  listing, which is exact; a source that does not implement `ReadDir`
+  still falls back to probing.
+
+- Security, **Breaking**: `Skill.Rules` refuses a token that opens a
+  specifier and supplies none, `Bash()`, and the bare carve-out
+  `Bash(!)`, as `agentpolicy`'s parser of the same grammar refuses
+  both. An empty specifier used to parse as `{Tool: "Bash", Spec: ""}`,
+  which is indistinguishable from the bare token `Bash` and, crossing
+  to a policy, matches every call of the tool: the narrowest-looking
+  thing a skill can write arrived as the widest grant there is. Both
+  tokens are now an error from `Rules` and an error-severity `Problem`
+  on the `allowed-tools` field, naming the token. The reference
+  validator still accepts them, so this is a deliberate divergence.
+
+- **Breaking**: `Catalog.Prompt` renders, and the `skill` tool serves,
+  only the skills with both a name and a description. A skill missing
+  either loads and is reported in `Catalog.Problems` as before, but an
+  entry the model cannot call or choose is no longer put in front of
+  it; the empty name used to appear in the block and in the tool's own
+  list of available skills, between two commas. `Catalog.Listed`
+  returns that subset, and `Catalog.Names` and `Catalog.Lookup` now
+  agree with it.
+
+- Added: the `skill` tool sets a `Read` as its result's `Details`,
+  carrying the skill's name, the `SKILL.md` behind that name, the path
+  served and a sha256 of the bytes served. It implements
+  `agenttool.Recordable` under the exported namespace
+  `agentskill.RecordNS`, so a recorder that knows nothing about skills
+  writes it beside the call: a session can then say which `SKILL.md`
+  was served, where a name alone is whatever discovery resolved to at
+  the time, and a replay that serves different bytes for the same name
+  is detectable. Requires agenttool v0.0.5, where `Recordable` arrived.
+
+- **Breaking**: a repeated frontmatter key is a load error, as
+  `strictyaml` makes it for the reference reader, rather than a silent
+  last-wins. A SKILL.md whose `description` or `allowed-tools` is
+  written twice used to load carrying the second value, so a reviewer
+  reading the diff and the model reading the skill were told different
+  things; there is no correct value to load, so the file does not load
+  at all.
+
+- Documentation: the README bounds the conformance claim and names the
+  three classes of input outside it, the YAML dialect, Unicode
+  normalisation and an empty `allowed-tools` specifier, saying which
+  way each parts; `Validate`'s doc comment says the same in one
+  sentence. The fixture tree and the reference CLI's output over it are
+  under `testdata/ref`, and the tests hold both claims to it.
+
 ## v0.0.2 - 2026-09-20
 
 - Removed: the `instructions` package. The AGENTS.md convention is now

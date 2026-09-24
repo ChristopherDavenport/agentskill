@@ -2,7 +2,11 @@ package agentskill
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -132,6 +136,110 @@ func TestToolFiles(t *testing.T) {
 				t.Errorf("part is %T", parts[0])
 			}
 		})
+	}
+}
+
+// TestToolRecordsWhatItServed: a skill read is the moment a model
+// takes instructions from a file on disk, and the only trace of it in
+// a session used to be the arguments the model wrote. Every successful
+// call carries a Read as Details, with the location behind the name
+// and a digest of the bytes served, so a reader can say which SKILL.md
+// that was and a replay that serves different bytes is detectable.
+func TestToolRecordsWhatItServed(t *testing.T) {
+	dir := skillsDir(t)
+	tool := fixtureCatalog(t).Tool()
+	onDisk := func(parts ...string) []byte {
+		t.Helper()
+		data, err := os.ReadFile(filepath.Join(append([]string{dir, "pdf-processing"}, parts...)...))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return data
+	}
+	tests := []struct {
+		name     string
+		args     string
+		wantPath string
+		// served is the bytes the digest must cover: the reply itself
+		// for the instructions, the file's own bytes for a file.
+		served func(res agenttool.Result) []byte
+	}{
+		{
+			name: "instructions",
+			args: `{"name":"pdf-processing"}`,
+			served: func(res agenttool.Result) []byte {
+				return []byte(res.Output.Parts[0].(*openresponses.InputText).Text)
+			},
+		},
+		{
+			name:     "text file",
+			args:     `{"name":"pdf-processing","path":"scripts/extract.py"}`,
+			wantPath: "scripts/extract.py",
+			served:   func(agenttool.Result) []byte { return onDisk("scripts", "extract.py") },
+		},
+		{
+			name:     "image, hashed before it is base64 encoded",
+			args:     `{"name":"pdf-processing","path":"assets/logo.png"}`,
+			wantPath: "assets/logo.png",
+			served:   func(agenttool.Result) []byte { return onDisk("assets", "logo.png") },
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res, err := tool.Execute(context.Background(), agenttool.Call{ID: "c1", Args: json.RawMessage(tt.args)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			read, ok := res.Details.(Read)
+			if !ok {
+				t.Fatalf("Details = %#v, want a Read", res.Details)
+			}
+			served := tt.served(res)
+			sum := sha256.Sum256(served)
+			want := Read{
+				Name:     "pdf-processing",
+				Location: dir + "/pdf-processing/SKILL.md",
+				Path:     tt.wantPath,
+				Bytes:    len(served),
+				SHA256:   hex.EncodeToString(sum[:]),
+			}
+			if read != want {
+				t.Errorf("Details = %+v, want %+v", read, want)
+			}
+
+			// A recorder that knows nothing about skills can write it.
+			rec, err := agenttool.RecordOf(res.Details)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if rec == nil {
+				t.Fatal("RecordOf() = nil; the details are not Recordable")
+			}
+			if rec.NS != RecordNS || rec.NS != read.RecordNS() {
+				t.Errorf("namespace = %q, want %q", rec.NS, RecordNS)
+			}
+			var back Read
+			if err := json.Unmarshal(rec.Data, &back); err != nil {
+				t.Fatal(err)
+			}
+			if back != want {
+				t.Errorf("recorded %+v, want %+v", back, want)
+			}
+			if tt.wantPath == "" && strings.Contains(string(rec.Data), `"path"`) {
+				t.Errorf("recorded %s, want no path for a read of the instructions", rec.Data)
+			}
+		})
+	}
+}
+
+// A call that serves nothing records nothing.
+func TestToolErrorHasNoRecord(t *testing.T) {
+	res, err := fixtureCatalog(t).Tool().Execute(context.Background(), agenttool.Call{ID: "c1", Args: json.RawMessage(`{"name":"nope"}`)})
+	if err == nil {
+		t.Fatal("want an error")
+	}
+	if res.Details != nil {
+		t.Errorf("Details = %#v, want none", res.Details)
 	}
 }
 

@@ -101,7 +101,13 @@ func TestRules(t *testing.T) {
 		{in: "   "},
 		{in: "Read", want: []ToolRule{{Tool: "Read"}}},
 		{in: "Bash(git:*) Read\tWrite(*.md)", want: []ToolRule{{Tool: "Bash", Spec: "git:*"}, {Tool: "Read"}, {Tool: "Write", Spec: "*.md"}}},
-		{in: "Bash()", want: []ToolRule{{Tool: "Bash"}}},
+		// A token that opens a specifier and supplies none is refused,
+		// as agentpolicy refuses it; see
+		// TestEmptySpecifierNeverBecomesARule.
+		{in: "Bash()", err: `allowed-tools token "Bash()": empty specifier`},
+		{in: "Bash(!)", err: `allowed-tools token "Bash(!)": empty carve-out`},
+		{in: "Read Bash() Write", err: `allowed-tools token "Bash()": empty specifier`},
+		{in: "Bash(())", want: []ToolRule{{Tool: "Bash", Spec: "()"}}},
 		{in: "Bash(a(b))", want: []ToolRule{{Tool: "Bash", Spec: "a(b)"}}},
 		// Whitespace inside parentheses does not end a token, so the
 		// documented examples parse: "Bash(git add *)" and a path with
@@ -139,6 +145,49 @@ func TestRules(t *testing.T) {
 				if !r.Matches(r.Tool) || r.Matches(r.Tool+"x") {
 					t.Errorf("Matches on %v is wrong", r)
 				}
+			}
+		})
+	}
+}
+
+// TestEmptySpecifierNeverBecomesARule pins the seam this package
+// shares with agentpolicy, where a ToolRule maps onto a Rule field for
+// field: a Rule whose Spec is empty is bare, and a bare rule matches
+// every call of the tool. So a token that names a specifier and
+// supplies none must never leave Rules as a rule; it is a problem on
+// the allowed-tools field, naming the token, and the skill does not
+// validate.
+func TestEmptySpecifierNeverBecomesARule(t *testing.T) {
+	tests := []struct {
+		name    string
+		allowed string
+		want    string
+	}{
+		{name: "alone", allowed: "Bash()", want: `allowed-tools token "Bash()": empty specifier`},
+		{name: "beside a bare rule", allowed: "Bash() Read", want: `allowed-tools token "Bash()": empty specifier`},
+		{name: "after a real specifier", allowed: "Bash(git status:*) Bash()", want: `allowed-tools token "Bash()": empty specifier`},
+		{name: "empty carve-out", allowed: "Bash(!)", want: `allowed-tools token "Bash(!)": empty carve-out`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Skill{Name: "wide-open", Description: "d", AllowedTools: tt.allowed}
+			rules, err := s.Rules()
+			if err == nil {
+				t.Fatalf("Rules() = %v, want an error", rules)
+			}
+			if err.Error() != tt.want {
+				t.Errorf("Rules() error = %q, want %q", err, tt.want)
+			}
+			if rules != nil {
+				t.Errorf("Rules() = %v, want no rules", rules)
+			}
+			problems := s.Validate()
+			want := []Problem{{Severity: Error, Field: "allowed-tools", Message: tt.want}}
+			if !reflect.DeepEqual(problems, want) {
+				t.Errorf("Validate() = %v, want %v", problems, want)
+			}
+			if !HasErrors(problems) {
+				t.Error("the skill validates clean")
 			}
 		})
 	}

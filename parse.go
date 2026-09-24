@@ -44,6 +44,12 @@ var (
 // such as a name that is a list, loads with an empty field and is
 // reported by [Skill.Validate].
 //
+// A key written twice is one of the YAML failures, as it is for the
+// reference reader's strictyaml, rather than a problem to report: the
+// file says two things with equal authority and there is no correct
+// value to load. A reviewer's eye stops at the first line, and the
+// model would be told the second.
+//
 // The fence is line based: the first line must be "---" and the
 // frontmatter runs to the next line that is "---". The body is
 // everything after that line, verbatim. Scalars are read as their
@@ -76,6 +82,10 @@ func Parse(src []byte) (*Skill, error) {
 			return nil, fmt.Errorf("Invalid YAML in frontmatter: line %d: mapping key is not a scalar", k.Line)
 		}
 		key := k.Value
+		if s.keys[key] {
+			//lint:ignore ST1005 mirrors the reference validator's wording
+			return nil, fmt.Errorf("Invalid YAML in frontmatter: line %d: duplicate key %q", k.Line, key)
+		}
 		s.keys[key] = true
 		switch key {
 		case keyName:
