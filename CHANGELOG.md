@@ -7,6 +7,15 @@ versions may break the API.
 
 ## Unreleased
 
+- Fixed: `Load` reports the skill file under the spelling it has on
+  disk. The name was taken from the probe that succeeded, and on a
+  case-insensitive file system — APFS and HFS+ on macOS, NTFS on
+  Windows — reading `SKILL.md` succeeds against a file really named
+  `skill.md`, so `Skill.Location` named a path that does not exist on a
+  case-sensitive host. The spelling now comes from the directory
+  listing, which is exact; a source that does not implement `ReadDir`
+  still falls back to probing.
+
 - Security, **Breaking**: `Skill.Rules` refuses a token that opens a
   specifier and supplies none, `Bash()`, and the bare carve-out
   `Bash(!)`, as `agentpolicy`'s parser of the same grammar refuses
