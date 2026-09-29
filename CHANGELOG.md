@@ -5,6 +5,12 @@ All user-visible changes to this library. The format follows
 uses [Semantic Versioning](https://semver.org/); before v1.0.0 minor
 versions may break the API.
 
+## Unreleased
+
+- Dependencies: agenttool v0.0.9 to v0.0.10, and agentturn v0.0.10 to
+  v0.0.11, which is used by the tests alone. No API of this module
+  changes with them.
+
 ## v0.0.6 - 2026-09-28
 
 - Fixed: a skill `Catalog.Listed` will not offer, for want of a name or
