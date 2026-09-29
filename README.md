@@ -52,7 +52,11 @@ skill that was and a replay serving other bytes is detectable.
   frontmatter key included; a valid file with a bad name loads and says
   what is wrong.
 - `Discover(sources...)` walks each source's direct children; the
-  first skill with a given name wins, as PATH resolves a command.
+  first skill with a given name wins, as PATH resolves a command. A
+  source with a `Qualifier` lists a skill of a taken name as
+  `<qualifier>:<name>`, as Claude Code lists a nested or plugin skill,
+  rather than shadowing it. A skill with no name or description claims
+  no name, and two sources may not share a `Location`.
   `Catalog.Listed` is the subset the prompt renders and the tool
   serves, and `Lookup` and `Names` agree with it.
 - `Dir(path)` is the source for a local directory, with one guard

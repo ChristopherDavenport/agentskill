@@ -5,6 +5,38 @@ All user-visible changes to this library. The format follows
 uses [Semantic Versioning](https://semver.org/); before v1.0.0 minor
 versions may break the API.
 
+## Unreleased
+
+- Fixed: a skill `Catalog.Listed` will not offer, for want of a name or
+  a description, no longer claims a name in `Discover`. It was keyed by
+  its directory name, or by a name it had without a description, so a
+  later source's working skill of that name went to `Shadowed` and the
+  catalogue offered nothing under it. It stays in `Skills` and its
+  problems in `Problems`, as before. (#19)
+- **Breaking**: `Discover` refuses two sources with one `Location`,
+  with an error naming both indices, and so does `DiscoverDirs` given
+  one directory twice. Their skills of one directory name shared a
+  location, so the second's load error was filed in `Problems` under
+  the first's healthy skill, and the prompt showed the model the same
+  `<location>` for both. Migration: give each source its own
+  `Location`, such as `builtin` and `builtin/pack` for two embedded
+  bundles. (#20)
+- `Source.Qualifier` lists a skill whose name an earlier source already
+  claimed as `<qualifier>:<name>`, such as `apps/web:deploy` or
+  `my-plugin:deploy`, rather than shadowing it, as Claude Code lists a
+  nested directory's or a plugin's skill; a free name is listed under
+  its name, and a taken qualified name is shadowed. `Discover` sets
+  `Skill.Qualifier` on such a skill, and `Skill.ListedName()` is the
+  name `Prompt`, `Names`, `Lookup`, the tool and its `Read` record use.
+  `Validate` still checks `Name` against the directory, since the
+  qualifier is the product's. A source without one shadows as before,
+  and the prompt then matches skills-ref as before. Which sources are
+  nested or plugins, and what to call them, is the product's to say.
+  (#18)
+- Dependencies: agenttool v0.0.8 to v0.0.9, and agentturn v0.0.9 to
+  v0.0.10, which is used by the tests alone. No API of this module
+  changes with them.
+
 ## v0.0.5 - 2026-09-28
 
 - Dependencies: agenttool v0.0.7 to v0.0.8, and agentturn v0.0.8 to

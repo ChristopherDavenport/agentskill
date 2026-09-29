@@ -34,8 +34,16 @@ type Source struct {
 	FS fs.FS
 	// Location names the source for the model, such as an absolute
 	// directory, a URL or "mcp://docs". A skill's location is this
-	// joined with the skill's directory name and SKILL.md.
+	// joined with the skill's directory name and SKILL.md. Two sources
+	// given to one [Discover] must not share it.
 	Location string
+	// Qualifier, when set, names the source for the model the way a
+	// nested directory or a plugin is named, such as "apps/web" or
+	// "my-plugin". A skill of this source whose name an earlier source
+	// already claimed is listed as "<Qualifier>:<name>" rather than
+	// shadowed; a skill whose name is free is listed under its name.
+	// Without it a taken name is shadowed.
+	Qualifier string
 }
 
 // Skill is one skill directory, loaded. The frontmatter fields carry
@@ -76,6 +84,13 @@ type Skill struct {
 
 	// Body is the Markdown after the frontmatter, verbatim.
 	Body string
+
+	// Qualifier is the source's [Source.Qualifier] when [Discover]
+	// listed the skill under a qualified name because an earlier source
+	// held its own, and empty otherwise. [Skill.ListedName] joins it
+	// with Name. It is the product's, not the author's, so validation
+	// never reads it.
+	Qualifier string
 
 	// keys records which frontmatter keys were present, so validation
 	// can tell a missing name from an empty one. It is nil for a Skill
@@ -133,6 +148,16 @@ func HasErrors(problems []Problem) bool {
 		}
 	}
 	return false
+}
+
+// ListedName is the name the catalog lists the skill under, which the
+// model calls the skill tool with: Name, or "<Qualifier>:<Name>" when
+// [Discover] qualified it.
+func (s *Skill) ListedName() string {
+	if s.Qualifier == "" {
+		return s.Name
+	}
+	return s.Qualifier + ":" + s.Name
 }
 
 // present reports whether the frontmatter had key. A literal Skill has

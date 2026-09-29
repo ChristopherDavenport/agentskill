@@ -25,17 +25,31 @@ type Catalog struct {
 // Discover loads every skill under the sources: each direct child
 // directory holding a SKILL.md is one skill. Sources are searched in
 // order and the first skill with a given name wins, as PATH resolves a
-// command, so a caller lists the most specific source first. A child
-// without a SKILL.md is not a skill and is skipped.
+// command, so a caller lists the most specific source first. A later
+// skill of a taken name is shadowed, unless its source has a
+// [Source.Qualifier], in which case it is listed under the qualified
+// name, and shadowed only if that is taken too. A child without a
+// SKILL.md is not a skill and is skipped.
+//
+// A skill [Catalog.Listed] will not offer, for want of a name or a
+// description, is kept in Skills but claims no name, so it never
+// shadows a skill that could be offered.
 //
 // A skill that fails to load is not fatal: the error goes into Problems
 // under its location and discovery continues. A source whose FS cannot
 // be read at its root is an error, because a missing local directory
 // should be skipped by the caller on [Dir]'s error, not silently here.
+// So are two sources with one Location, whose skills of one directory
+// name would share a location in the prompt and a key in Problems.
 func Discover(sources ...Source) (*Catalog, error) {
 	c := &Catalog{Problems: map[string][]Problem{}}
 	seen := map[string]bool{}
-	for _, src := range sources {
+	locations := map[string]int{}
+	for i, src := range sources {
+		if prior, ok := locations[src.Location]; ok {
+			return nil, fmt.Errorf("agentskill: sources %d and %d share the location %q; give each source its own", prior, i, src.Location)
+		}
+		locations[src.Location] = i
 		if src.FS == nil {
 			return nil, fmt.Errorf("agentskill: source %q has no FS", src.Location)
 		}
@@ -65,11 +79,16 @@ func Discover(sources ...Source) (*Catalog, error) {
 			if problems := s.Validate(); len(problems) > 0 {
 				c.Problems[s.Location] = problems
 			}
-			key := s.Name
-			if key == "" {
-				key = s.DirName
+			if s.Name == "" || s.Description == "" {
+				c.Skills = append(c.Skills, s)
+				continue
 			}
+			if seen[s.Name] && src.Qualifier != "" {
+				s.Qualifier = src.Qualifier
+			}
+			key := s.ListedName()
 			if seen[key] {
+				s.Qualifier = ""
 				c.Shadowed = append(c.Shadowed, s)
 				continue
 			}
@@ -142,37 +161,39 @@ func (c *Catalog) Listed() []*Skill {
 	return listed
 }
 
-// Lookup returns the skill named name, among the skills [Catalog.Listed]
-// offers, so what the model can be served is what the prompt lists.
+// Lookup returns the skill listed as name, its [Skill.ListedName],
+// among the skills [Catalog.Listed] offers, so what the model can be
+// served is what the prompt lists.
 func (c *Catalog) Lookup(name string) (*Skill, bool) {
 	if name == "" {
 		return nil, false
 	}
 	for _, s := range c.Listed() {
-		if s.Name == name {
+		if s.ListedName() == name {
 			return s, true
 		}
 	}
 	return nil, false
 }
 
-// Names returns the names of the skills [Catalog.Listed] offers, in
-// catalog order.
+// Names returns the listed names of the skills [Catalog.Listed]
+// offers, in catalog order.
 func (c *Catalog) Names() []string {
 	listed := c.Listed()
 	names := make([]string, 0, len(listed))
 	for _, s := range listed {
-		names = append(names, s.Name)
+		names = append(names, s.ListedName())
 	}
 	return names
 }
 
 // Prompt renders the available_skills block in the exact shape of the
 // reference library's to_prompt: one skill entry per skill in catalog
-// order, its name, description and location each on their own line
-// between their tags, with the name and description HTML-escaped. For
-// local sources the output is byte for byte what skills-ref to-prompt
-// prints for the same directories. An empty catalog renders the empty
+// order, its listed name, description and location each on their own
+// line between their tags, with the name and description HTML-escaped.
+// For local sources without a [Source.Qualifier] the output is byte for
+// byte what skills-ref to-prompt prints for the same directories; the
+// reference has no qualified names. An empty catalog renders the empty
 // block.
 //
 // Only the skills [Catalog.Listed] offers are rendered: an entry the
@@ -185,7 +206,7 @@ func (c *Catalog) Prompt() string {
 	b.WriteString("<available_skills>\n")
 	for _, s := range c.Listed() {
 		b.WriteString("<skill>\n<name>\n")
-		b.WriteString(escape(s.Name))
+		b.WriteString(escape(s.ListedName()))
 		b.WriteString("\n</name>\n<description>\n")
 		b.WriteString(escape(s.Description))
 		b.WriteString("\n</description>\n<location>\n")
