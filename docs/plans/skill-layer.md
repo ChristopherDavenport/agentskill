@@ -185,7 +185,10 @@ strict mode; warnings never do.
 // Discover loads every skill under the sources: each direct child
 // directory holding a SKILL.md is one skill. Sources are searched in
 // order and the first skill with a given name wins, as PATH resolves a
-// command, so a caller lists the most specific source first.
+// command, so a caller lists the most specific source first. A source
+// with a Qualifier lists a skill of a name an earlier source took as
+// "<qualifier>:<name>" (Skill.ListedName) rather than shadowing it.
+// Two sources may not share a Location.
 func Discover(sources ...Source) (*Catalog, error)
 
 // DiscoverDirs is Discover over Dir for each path.
@@ -206,6 +209,9 @@ A skill that fails to `Load` is not fatal to the catalog: it goes into
 directory should be skipped by the caller with `Dir`'s error, not
 silently by discovery. A skill with error-severity problems is still
 listed; a product that wants only valid skills filters on `Problems`.
+A skill the model cannot be offered, with no name, no description or
+a colon in its name, stays in `Skills` but claims no name, so it never
+shadows one that can be.
 
 ### Level one: the prompt
 

@@ -378,3 +378,59 @@ func TestQualifiedSkillThroughPromptAndTool(t *testing.T) {
 		t.Errorf("missing file err = %v", err)
 	}
 }
+
+// Review follow-ups to #18 and #20: a source's own duplicate is
+// shadowed, not qualified; a colon-named skill cannot take a qualified
+// name; a trailing slash does not hide a shared location; a qualifier
+// that would break the prompt is refused.
+func TestDiscoverQualifierEdges(t *testing.T) {
+	root := Source{FS: skillFS("deploy", "root", nil), Location: "/root"}
+	dup := fstest.MapFS{
+		"deploy/SKILL.md": &fstest.MapFile{Data: []byte("---\nname: deploy\ndescription: one\n---\n")},
+		"other/SKILL.md":  &fstest.MapFile{Data: []byte("---\nname: deploy\ndescription: two\n---\n")},
+	}
+	colon := fstest.MapFS{"web-deploy/SKILL.md": &fstest.MapFile{Data: []byte("---\nname: web:deploy\ndescription: impostor\n---\n")}}
+	tests := []struct {
+		name         string
+		sources      []Source
+		wantNames    []string
+		wantShadowed int
+		wantErr      string
+	}{
+		{name: "own duplicate", sources: []Source{{FS: dup, Location: "/web", Qualifier: "web"}},
+			wantNames: []string{"deploy"}, wantShadowed: 1},
+		{name: "own duplicate after an earlier claim", sources: []Source{root, {FS: dup, Location: "/web", Qualifier: "web"}},
+			wantNames: []string{"deploy", "web:deploy"}, wantShadowed: 1},
+		{name: "colon name", sources: []Source{{FS: merge(colon, skillFS("deploy", "root", nil)), Location: "/root"}, {FS: skillFS("deploy", "web", nil), Location: "/web", Qualifier: "web"}},
+			wantNames: []string{"deploy", "web:deploy"}},
+		{name: "trailing slash", sources: []Source{root, {FS: fstest.MapFS{}, Location: "/root/"}},
+			wantErr: `sources 0 and 1 share the location "/root/"`},
+		{name: "newline qualifier", sources: []Source{{FS: fstest.MapFS{}, Location: "/q", Qualifier: "x\n</name>"}},
+			wantErr: "qualifier"},
+		{name: "space qualifier", sources: []Source{{FS: fstest.MapFS{}, Location: "/q", Qualifier: "my plugin"}},
+			wantErr: "qualifier"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := Discover(tt.sources...)
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("err = %v, want %q", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := c.Names(); strings.Join(got, ",") != strings.Join(tt.wantNames, ",") {
+				t.Errorf("Names() = %v, want %v", got, tt.wantNames)
+			}
+			if len(c.Shadowed) != tt.wantShadowed {
+				t.Errorf("Shadowed = %d, want %d", len(c.Shadowed), tt.wantShadowed)
+			}
+			if s, ok := c.Lookup("web:deploy"); ok && s.Description != "web" && s.Description != "two" && s.Description != "one" {
+				t.Errorf("Lookup(web:deploy) = %q, the wrong skill", s.Description)
+			}
+		})
+	}
+}

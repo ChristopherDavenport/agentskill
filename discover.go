@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/fs"
 	"strings"
+	"unicode"
 )
 
 // Catalog is the skills found by [Discover]: the winners in source
@@ -32,24 +33,34 @@ type Catalog struct {
 // SKILL.md is not a skill and is skipped.
 //
 // A skill [Catalog.Listed] will not offer, for want of a name or a
-// description, is kept in Skills but claims no name, so it never
+// description or for a colon in its name, is kept in Skills but claims no name, so it never
 // shadows a skill that could be offered.
 //
 // A skill that fails to load is not fatal: the error goes into Problems
 // under its location and discovery continues. A source whose FS cannot
 // be read at its root is an error, because a missing local directory
 // should be skipped by the caller on [Dir]'s error, not silently here.
-// So are two sources with one Location, whose skills of one directory
+// So is a qualifier holding whitespace or a control character, and so
+// are two sources with one Location, a trailing slash aside, whose skills of one directory
 // name would share a location in the prompt and a key in Problems.
 func Discover(sources ...Source) (*Catalog, error) {
 	c := &Catalog{Problems: map[string][]Problem{}}
-	seen := map[string]bool{}
+	// seen maps each claimed name to the index of the source that
+	// claimed it, so a qualifier applies only to a name taken by an
+	// earlier source and a source's own duplicate is shadowed.
+	seen := map[string]int{}
 	locations := map[string]int{}
 	for i, src := range sources {
-		if prior, ok := locations[src.Location]; ok {
+		// joinLocation drops a trailing slash, so "b" and "b/" name
+		// the same skills.
+		loc := strings.TrimSuffix(src.Location, "/")
+		if prior, ok := locations[loc]; ok {
 			return nil, fmt.Errorf("agentskill: sources %d and %d share the location %q; give each source its own", prior, i, src.Location)
 		}
-		locations[src.Location] = i
+		locations[loc] = i
+		if strings.IndexFunc(src.Qualifier, badQualifierRune) >= 0 {
+			return nil, fmt.Errorf("agentskill: source %q has qualifier %q; a qualifier may not hold whitespace or control characters", src.Location, src.Qualifier)
+		}
 		if src.FS == nil {
 			return nil, fmt.Errorf("agentskill: source %q has no FS", src.Location)
 		}
@@ -79,24 +90,38 @@ func Discover(sources ...Source) (*Catalog, error) {
 			if problems := s.Validate(); len(problems) > 0 {
 				c.Problems[s.Location] = problems
 			}
-			if s.Name == "" || s.Description == "" {
+			if !listable(s) {
 				c.Skills = append(c.Skills, s)
 				continue
 			}
-			if seen[s.Name] && src.Qualifier != "" {
+			if prior, ok := seen[s.Name]; ok && prior < i && src.Qualifier != "" {
 				s.Qualifier = src.Qualifier
 			}
 			key := s.ListedName()
-			if seen[key] {
+			if _, ok := seen[key]; ok {
 				s.Qualifier = ""
 				c.Shadowed = append(c.Shadowed, s)
 				continue
 			}
-			seen[key] = true
+			seen[key] = i
 			c.Skills = append(c.Skills, s)
 		}
 	}
 	return c, nil
+}
+
+// badQualifierRune reports a rune a qualifier may not hold: one that
+// would break the prompt's one-line name or read as two names.
+func badQualifierRune(r rune) bool {
+	return unicode.IsSpace(r) || unicode.IsControl(r)
+}
+
+// listable reports whether the model can be offered the skill: it has
+// a name to call it by and a description to choose it from, and the
+// name holds no colon, which the specification never allows and which
+// would pass for a qualified name.
+func listable(s *Skill) bool {
+	return s.Name != "" && s.Description != "" && !strings.Contains(s.Name, ":")
 }
 
 // DiscoverDirs is [Discover] over [Dir] for each path. A path that is
@@ -147,13 +172,18 @@ func findSkillFile(fsys fs.FS, dir string) (string, bool) {
 // as the client implementation guide says to skip it and as the
 // reference's to_prompt refuses to render it.
 //
+// A skill whose name holds a colon is left out too, where the reference
+// would render it: the specification never allows one, and listed it
+// would claim the "<qualifier>:<name>" a [Source.Qualifier] gives
+// another skill, so that the model reached the wrong one.
+//
 // It stays in Skills and its problems stay in Problems, so a product
 // can still list a broken skill and say what is wrong with it, which
 // is why they are loaded at all.
 func (c *Catalog) Listed() []*Skill {
 	listed := make([]*Skill, 0, len(c.Skills))
 	for _, s := range c.Skills {
-		if s.Name == "" || s.Description == "" {
+		if !listable(s) {
 			continue
 		}
 		listed = append(listed, s)

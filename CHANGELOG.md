@@ -13,10 +13,16 @@ versions may break the API.
   later source's working skill of that name went to `Shadowed` and the
   catalogue offered nothing under it. It stays in `Skills` and its
   problems in `Problems`, as before. (#19)
+- A skill whose name holds a colon is no longer offered: `Listed`,
+  `Prompt`, `Names`, `Lookup` and the tool leave it out, and it claims
+  no name. The specification never allows one, and listed it would
+  take the qualified name below from the skill it belongs to. The
+  reference renders it, so this is a divergence, as for a skill with
+  no name.
 - **Breaking**: `Discover` refuses two sources with one `Location`,
-  with an error naming both indices, and so does `DiscoverDirs` given
-  one directory twice. Their skills of one directory name shared a
-  location, so the second's load error was filed in `Problems` under
+  a trailing slash aside, with an error naming both indices, and so
+  does `DiscoverDirs` given one directory twice. Their skills of one
+  directory name shared a location, so the second's load error was filed in `Problems` under
   the first's healthy skill, and the prompt showed the model the same
   `<location>` for both. Migration: give each source its own
   `Location`, such as `builtin` and `builtin/pack` for two embedded
@@ -25,7 +31,9 @@ versions may break the API.
   claimed as `<qualifier>:<name>`, such as `apps/web:deploy` or
   `my-plugin:deploy`, rather than shadowing it, as Claude Code lists a
   nested directory's or a plugin's skill; a free name is listed under
-  its name, and a taken qualified name is shadowed. `Discover` sets
+  its name, and a taken qualified name, or a second skill of one name
+  in the same source, is shadowed. A qualifier holding whitespace or a
+  control character is an error. `Discover` sets
   `Skill.Qualifier` on such a skill, and `Skill.ListedName()` is the
   name `Prompt`, `Names`, `Lookup`, the tool and its `Read` record use.
   `Validate` still checks `Name` against the directory, since the

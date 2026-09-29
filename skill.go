@@ -41,8 +41,10 @@ type Source struct {
 	// nested directory or a plugin is named, such as "apps/web" or
 	// "my-plugin". A skill of this source whose name an earlier source
 	// already claimed is listed as "<Qualifier>:<name>" rather than
-	// shadowed; a skill whose name is free is listed under its name.
-	// Without it a taken name is shadowed.
+	// shadowed; a skill whose name is free is listed under its name,
+	// and a second skill of one name within this source is shadowed.
+	// Without it a taken name is shadowed. It may not hold whitespace
+	// or control characters.
 	Qualifier string
 }
 
