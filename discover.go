@@ -16,7 +16,8 @@ type Catalog struct {
 	// a product that wants only valid skills filters on Problems.
 	Skills []*Skill
 	// Shadowed holds skills whose name an earlier source had already
-	// claimed, kept so a product can report them.
+	// claimed, kept so a product can report them. Each one's
+	// [Skill.ShadowedBy] names the skill that holds the name.
 	Shadowed []*Skill
 	// Problems maps a skill's location to what [Skill.Validate]
 	// reported, or to the one error that stopped it loading.
@@ -45,10 +46,15 @@ type Catalog struct {
 // name would share a location in the prompt and a key in Problems.
 func Discover(sources ...Source) (*Catalog, error) {
 	c := &Catalog{Problems: map[string][]Problem{}}
-	// seen maps each claimed name to the index of the source that
-	// claimed it, so a qualifier applies only to a name taken by an
-	// earlier source and a source's own duplicate is shadowed.
-	seen := map[string]int{}
+	// seen maps each claimed name to the skill that claimed it and the
+	// index of its source, so a qualifier applies only to a name taken
+	// by an earlier source, a source's own duplicate is shadowed, and a
+	// shadowed skill can name the one that holds its name.
+	type claim struct {
+		source int
+		skill  *Skill
+	}
+	seen := map[string]claim{}
 	locations := map[string]int{}
 	for i, src := range sources {
 		// joinLocation drops a trailing slash, so "b" and "b/" name
@@ -94,16 +100,17 @@ func Discover(sources ...Source) (*Catalog, error) {
 				c.Skills = append(c.Skills, s)
 				continue
 			}
-			if prior, ok := seen[s.Name]; ok && prior < i && src.Qualifier != "" {
+			if prior, ok := seen[s.Name]; ok && prior.source < i && src.Qualifier != "" {
 				s.Qualifier = src.Qualifier
 			}
 			key := s.ListedName()
-			if _, ok := seen[key]; ok {
+			if winner, ok := seen[key]; ok {
 				s.Qualifier = ""
+				s.ShadowedBy = winner.skill.Location
 				c.Shadowed = append(c.Shadowed, s)
 				continue
 			}
-			seen[key] = i
+			seen[key] = claim{source: i, skill: s}
 			c.Skills = append(c.Skills, s)
 		}
 	}

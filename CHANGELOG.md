@@ -5,6 +5,17 @@ All user-visible changes to this library. The format follows
 uses [Semantic Versioning](https://semver.org/); before v1.0.0 minor
 versions may break the API.
 
+## Unreleased
+
+- Added: `Skill.ShadowedBy`, the `Location` of the skill that holds the
+  name a shadowed skill wanted. `Discover` sets it on each skill in
+  `Catalog.Shadowed`. A skill shadowed under a taken qualified name
+  has its `Qualifier` cleared, so nothing on it said which name it
+  lost, and a product reading the winner from `Listed` by its bare
+  name blamed a skill that never competed for it. (#23)
+- Dependencies: agenttool v0.0.10 to v0.0.11, and agentturn v0.0.11 to
+  v0.0.12, which is used by the tests alone.
+
 ## v0.0.7 - 2026-09-29
 
 - Dependencies: agenttool v0.0.9 to v0.0.10, and agentturn v0.0.10 to

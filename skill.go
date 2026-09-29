@@ -93,6 +93,11 @@ type Skill struct {
 	// with Name. It is the product's, not the author's, so validation
 	// never reads it.
 	Qualifier string
+	// ShadowedBy is the Location of the skill that holds the name this
+	// one wanted, which may be a qualified name when Qualifier was
+	// cleared. [Discover] sets it on each skill in [Catalog.Shadowed]
+	// and leaves it empty otherwise.
+	ShadowedBy string
 
 	// keys records which frontmatter keys were present, so validation
 	// can tell a missing name from an empty one. It is nil for a Skill

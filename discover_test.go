@@ -283,7 +283,9 @@ func TestDiscoverSharedLocation(t *testing.T) {
 }
 
 // A source with a Qualifier lists a skill of a taken name under the
-// qualified name rather than shadowing it (#18).
+// qualified name rather than shadowing it (#18), and each shadowed
+// skill names the skill holding the name it wanted (#23). A shadowed
+// entry reads "<location> <- <ShadowedBy>".
 func TestDiscoverQualifier(t *testing.T) {
 	root := Source{FS: merge(skillFS("deploy", "Deploy the monorepo.", nil), skillFS("lint", "Lint.", nil)), Location: "/repo/.claude/skills"}
 	tests := []struct {
@@ -297,7 +299,7 @@ func TestDiscoverQualifier(t *testing.T) {
 			sources: []Source{root,
 				{FS: skillFS("deploy", "web", nil), Location: "/repo/apps/web/.claude/skills"}},
 			wantNames:    []string{"deploy", "lint"},
-			wantShadowed: []string{"/repo/apps/web/.claude/skills/deploy/SKILL.md"},
+			wantShadowed: []string{"/repo/apps/web/.claude/skills/deploy/SKILL.md <- /repo/.claude/skills/deploy/SKILL.md"},
 		},
 		{
 			name: "a taken name is qualified and a free one is not",
@@ -311,7 +313,15 @@ func TestDiscoverQualifier(t *testing.T) {
 				{FS: skillFS("deploy", "web", nil), Location: "/a", Qualifier: "plugin"},
 				{FS: skillFS("deploy", "web again", nil), Location: "/b", Qualifier: "plugin"}},
 			wantNames:    []string{"deploy", "lint", "plugin:deploy"},
-			wantShadowed: []string{"/b/deploy/SKILL.md"},
+			wantShadowed: []string{"/b/deploy/SKILL.md <- /a/deploy/SKILL.md"},
+		},
+		{
+			name: "a second source under a taken qualifier names the qualified winner",
+			sources: []Source{root,
+				{FS: skillFS("deploy", "web", nil), Location: "/repo/apps/web/.claude/skills", Qualifier: "apps/web"},
+				{FS: skillFS("deploy", "generated", nil), Location: "/repo/apps/web/more", Qualifier: "apps/web"}},
+			wantNames:    []string{"deploy", "lint", "apps/web:deploy"},
+			wantShadowed: []string{"/repo/apps/web/more/deploy/SKILL.md <- /repo/apps/web/.claude/skills/deploy/SKILL.md"},
 		},
 		{
 			name: "the first of a name is never qualified",
@@ -319,7 +329,7 @@ func TestDiscoverQualifier(t *testing.T) {
 				{FS: skillFS("deploy", "plugin", nil), Location: "/p", Qualifier: "plugin"},
 				root},
 			wantNames:    []string{"deploy", "lint"},
-			wantShadowed: []string{"/repo/.claude/skills/deploy/SKILL.md"},
+			wantShadowed: []string{"/repo/.claude/skills/deploy/SKILL.md <- /p/deploy/SKILL.md"},
 		},
 	}
 	for _, tt := range tests {
@@ -336,7 +346,12 @@ func TestDiscoverQualifier(t *testing.T) {
 				if s.Qualifier != "" {
 					t.Errorf("shadowed %s has Qualifier %q, want none", s.Location, s.Qualifier)
 				}
-				shadowed = append(shadowed, s.Location)
+				shadowed = append(shadowed, s.Location+" <- "+s.ShadowedBy)
+			}
+			for _, s := range c.Skills {
+				if s.ShadowedBy != "" {
+					t.Errorf("listed %s has ShadowedBy %q, want none", s.Location, s.ShadowedBy)
+				}
 			}
 			if strings.Join(shadowed, ",") != strings.Join(tt.wantShadowed, ",") {
 				t.Errorf("Shadowed = %v, want %v", shadowed, tt.wantShadowed)

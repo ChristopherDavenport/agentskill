@@ -196,7 +196,7 @@ func DiscoverDirs(dirs ...string) (*Catalog, error)
 
 type Catalog struct {
     Skills   []*Skill            // in source order, then directory-name order, winners only
-    Shadowed []*Skill            // later duplicates, kept so a product can report them
+    Shadowed []*Skill            // later duplicates, kept so a product can report them; each one's ShadowedBy is the winner's Location
     Problems map[string][]Problem // per skill location, from Validate
 }
 
