@@ -126,7 +126,7 @@ func (c *Catalog) Tool(opts ...ToolOption) agenttool.Tool {
 			sum := sha256.Sum256(served)
 			res := agenttool.Parts(parts...)
 			res.Details = Read{
-				Name:     s.Name,
+				Name:     s.ListedName(),
 				Location: s.Location,
 				Path:     a.Path,
 				Bytes:    len(served),
@@ -208,7 +208,7 @@ func noSuchFile(s *Skill, name string) error {
 	if err != nil {
 		return err
 	}
-	return fmt.Errorf("skill %q has no file %q; files: %s", s.Name, name, listOrNone(files))
+	return fmt.Errorf("skill %q has no file %q; files: %s", s.ListedName(), name, listOrNone(files))
 }
 
 func listOrNone(items []string) string {

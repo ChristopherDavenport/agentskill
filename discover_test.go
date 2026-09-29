@@ -1,6 +1,8 @@
 package agentskill
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"io/fs"
 	"os"
@@ -8,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+
+	"github.com/ChristopherDavenport/agenttool"
 )
 
 func skillFS(name, description string, extra map[string]string) fstest.MapFS {
@@ -228,5 +232,205 @@ func TestDirSymlinkGuard(t *testing.T) {
 	}
 	if files, err := (&Skill{}).Files(); err != nil || files != nil {
 		t.Errorf("Files on a skill without FS: %v, %v", files, err)
+	}
+}
+
+// An unlisted skill keeps its place in Skills but claims no name, so a
+// later source's skill of its directory name is listed, not shadowed
+// (#19).
+func TestDiscoverUnlistedClaimsNoName(t *testing.T) {
+	tests := []struct {
+		name string
+		md   string
+	}{
+		{"no name", "---\ndescription: d\n---\n"},
+		{"empty name and description", "---\nname: \"\"\ndescription: \"\"\n---\n"},
+		{"no description", "---\nname: deploy\n---\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			project := Source{FS: fstest.MapFS{"deploy/SKILL.md": &fstest.MapFile{Data: []byte(tt.md)}}, Location: "/repo"}
+			user := Source{FS: skillFS("deploy", "Deploy, my way.", nil), Location: "/home"}
+			c, err := Discover(project, user)
+			if err != nil {
+				t.Fatal(err)
+			}
+			s, ok := c.Lookup("deploy")
+			if !ok || s.Location != "/home/deploy/SKILL.md" {
+				t.Errorf("Lookup(deploy) = %v, %v; want the user's skill", s, ok)
+			}
+			if len(c.Skills) != 2 || len(c.Shadowed) != 0 {
+				t.Errorf("Skills = %d, Shadowed = %d; want both listed in Skills and none shadowed", len(c.Skills), len(c.Shadowed))
+			}
+		})
+	}
+}
+
+// Two sources with one Location are refused, since their skills of one
+// directory name would share a location and a key in Problems (#20).
+func TestDiscoverSharedLocation(t *testing.T) {
+	a := Source{FS: skillFS("foo", "first", nil), Location: "builtin"}
+	b := Source{FS: fstest.MapFS{"foo/SKILL.md": &fstest.MapFile{Data: []byte("not a skill")}}, Location: "builtin"}
+	other := Source{FS: fstest.MapFS{}, Location: "other"}
+	_, err := Discover(a, other, b)
+	if err == nil || !strings.Contains(err.Error(), "sources 0 and 2 share the location \"builtin\"") {
+		t.Errorf("err = %v, want the two indices and the location", err)
+	}
+	dir := t.TempDir()
+	if _, err := DiscoverDirs(dir, dir); err == nil {
+		t.Error("one directory twice: want error")
+	}
+}
+
+// A source with a Qualifier lists a skill of a taken name under the
+// qualified name rather than shadowing it (#18).
+func TestDiscoverQualifier(t *testing.T) {
+	root := Source{FS: merge(skillFS("deploy", "Deploy the monorepo.", nil), skillFS("lint", "Lint.", nil)), Location: "/repo/.claude/skills"}
+	tests := []struct {
+		name         string
+		sources      []Source
+		wantNames    []string
+		wantShadowed []string
+	}{
+		{
+			name: "no qualifier shadows",
+			sources: []Source{root,
+				{FS: skillFS("deploy", "web", nil), Location: "/repo/apps/web/.claude/skills"}},
+			wantNames:    []string{"deploy", "lint"},
+			wantShadowed: []string{"/repo/apps/web/.claude/skills/deploy/SKILL.md"},
+		},
+		{
+			name: "a taken name is qualified and a free one is not",
+			sources: []Source{root,
+				{FS: merge(skillFS("deploy", "web", nil), skillFS("serve", "Serve.", nil)), Location: "/repo/apps/web/.claude/skills", Qualifier: "apps/web"}},
+			wantNames: []string{"deploy", "lint", "apps/web:deploy", "serve"},
+		},
+		{
+			name: "a taken qualified name is shadowed",
+			sources: []Source{root,
+				{FS: skillFS("deploy", "web", nil), Location: "/a", Qualifier: "plugin"},
+				{FS: skillFS("deploy", "web again", nil), Location: "/b", Qualifier: "plugin"}},
+			wantNames:    []string{"deploy", "lint", "plugin:deploy"},
+			wantShadowed: []string{"/b/deploy/SKILL.md"},
+		},
+		{
+			name: "the first of a name is never qualified",
+			sources: []Source{
+				{FS: skillFS("deploy", "plugin", nil), Location: "/p", Qualifier: "plugin"},
+				root},
+			wantNames:    []string{"deploy", "lint"},
+			wantShadowed: []string{"/repo/.claude/skills/deploy/SKILL.md"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := Discover(tt.sources...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := c.Names(); strings.Join(got, ",") != strings.Join(tt.wantNames, ",") {
+				t.Errorf("Names() = %v, want %v", got, tt.wantNames)
+			}
+			var shadowed []string
+			for _, s := range c.Shadowed {
+				if s.Qualifier != "" {
+					t.Errorf("shadowed %s has Qualifier %q, want none", s.Location, s.Qualifier)
+				}
+				shadowed = append(shadowed, s.Location)
+			}
+			if strings.Join(shadowed, ",") != strings.Join(tt.wantShadowed, ",") {
+				t.Errorf("Shadowed = %v, want %v", shadowed, tt.wantShadowed)
+			}
+			for _, n := range tt.wantNames {
+				s, ok := c.Lookup(n)
+				if !ok || s.ListedName() != n {
+					t.Errorf("Lookup(%q) = %v, %v", n, s, ok)
+				}
+			}
+		})
+	}
+}
+
+// A qualified skill is rendered, looked up and recorded under its
+// qualified name, and validated under its own.
+func TestQualifiedSkillThroughPromptAndTool(t *testing.T) {
+	root := Source{FS: skillFS("deploy", "Deploy the monorepo.", nil), Location: "/repo"}
+	nested := Source{FS: skillFS("deploy", "Deploy the web app.", nil), Location: "/repo/apps/web", Qualifier: "apps/web"}
+	c, err := Discover(root, nested)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p := c.Prompt(); !strings.Contains(p, "<name>\napps/web:deploy\n</name>\n<description>\nDeploy the web app.\n</description>\n<location>\n/repo/apps/web/deploy/SKILL.md\n</location>") {
+		t.Errorf("Prompt() =\n%s\nwant the nested skill under its qualified name", p)
+	}
+	if len(c.Problems) != 0 {
+		t.Errorf("Problems = %v, want a qualified skill valid under its own name", c.Problems)
+	}
+	res, err := c.Tool().Execute(context.Background(), agenttool.Call{ID: "c1", Args: json.RawMessage(`{"name":"apps/web:deploy"}`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	read, ok := res.Details.(Read)
+	if !ok || read.Name != "apps/web:deploy" || read.Location != "/repo/apps/web/deploy/SKILL.md" {
+		t.Errorf("Details = %#v, want the nested skill under its qualified name", res.Details)
+	}
+	if _, err := c.Tool().Execute(context.Background(), agenttool.Call{ID: "c2", Args: json.RawMessage(`{"name":"apps/web:deploy","path":"missing.md"}`)}); err == nil || !strings.Contains(err.Error(), `skill "apps/web:deploy" has no file`) {
+		t.Errorf("missing file err = %v", err)
+	}
+}
+
+// Review follow-ups to #18 and #20: a source's own duplicate is
+// shadowed, not qualified; a colon-named skill cannot take a qualified
+// name; a trailing slash does not hide a shared location; a qualifier
+// that would break the prompt is refused.
+func TestDiscoverQualifierEdges(t *testing.T) {
+	root := Source{FS: skillFS("deploy", "root", nil), Location: "/root"}
+	dup := fstest.MapFS{
+		"deploy/SKILL.md": &fstest.MapFile{Data: []byte("---\nname: deploy\ndescription: one\n---\n")},
+		"other/SKILL.md":  &fstest.MapFile{Data: []byte("---\nname: deploy\ndescription: two\n---\n")},
+	}
+	colon := fstest.MapFS{"web-deploy/SKILL.md": &fstest.MapFile{Data: []byte("---\nname: web:deploy\ndescription: impostor\n---\n")}}
+	tests := []struct {
+		name         string
+		sources      []Source
+		wantNames    []string
+		wantShadowed int
+		wantErr      string
+	}{
+		{name: "own duplicate", sources: []Source{{FS: dup, Location: "/web", Qualifier: "web"}},
+			wantNames: []string{"deploy"}, wantShadowed: 1},
+		{name: "own duplicate after an earlier claim", sources: []Source{root, {FS: dup, Location: "/web", Qualifier: "web"}},
+			wantNames: []string{"deploy", "web:deploy"}, wantShadowed: 1},
+		{name: "colon name", sources: []Source{{FS: merge(colon, skillFS("deploy", "root", nil)), Location: "/root"}, {FS: skillFS("deploy", "web", nil), Location: "/web", Qualifier: "web"}},
+			wantNames: []string{"deploy", "web:deploy"}},
+		{name: "trailing slash", sources: []Source{root, {FS: fstest.MapFS{}, Location: "/root/"}},
+			wantErr: `sources 0 and 1 share the location "/root/"`},
+		{name: "newline qualifier", sources: []Source{{FS: fstest.MapFS{}, Location: "/q", Qualifier: "x\n</name>"}},
+			wantErr: "qualifier"},
+		{name: "space qualifier", sources: []Source{{FS: fstest.MapFS{}, Location: "/q", Qualifier: "my plugin"}},
+			wantErr: "qualifier"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := Discover(tt.sources...)
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("err = %v, want %q", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := c.Names(); strings.Join(got, ",") != strings.Join(tt.wantNames, ",") {
+				t.Errorf("Names() = %v, want %v", got, tt.wantNames)
+			}
+			if len(c.Shadowed) != tt.wantShadowed {
+				t.Errorf("Shadowed = %d, want %d", len(c.Shadowed), tt.wantShadowed)
+			}
+			if s, ok := c.Lookup("web:deploy"); ok && s.Description != "web" && s.Description != "two" && s.Description != "one" {
+				t.Errorf("Lookup(web:deploy) = %q, the wrong skill", s.Description)
+			}
+		})
 	}
 }
