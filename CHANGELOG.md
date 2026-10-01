@@ -5,7 +5,7 @@ All user-visible changes to this library. The format follows
 uses [Semantic Versioning](https://semver.org/); before v1.0.0 minor
 versions may break the API.
 
-## Unreleased
+## v0.0.9 - 2026-10-01
 
 - Documentation: `docs/source.md` restates the parts of the Agent
   Skills specification and client guide this module relies on. It also
