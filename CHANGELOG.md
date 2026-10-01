@@ -5,6 +5,12 @@ All user-visible changes to this library. The format follows
 uses [Semantic Versioning](https://semver.org/); before v1.0.0 minor
 versions may break the API.
 
+## Unreleased
+
+- Dependencies: agenttool v0.0.11 to v0.0.12, and agentturn v0.0.12 to
+  v0.0.13, which is used by the tests alone. No API of this module
+  changes with them.
+
 ## v0.0.8 - 2026-09-29
 
 - Added: `Skill.ShadowedBy`, the `Location` of the skill that holds the
