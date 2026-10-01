@@ -7,10 +7,6 @@ versions may break the API.
 
 ## Unreleased
 
-- Dependencies: agenttool v0.0.12 to v0.0.14, which agentturn v0.0.15
-  requires, and agentturn v0.0.13 to v0.0.15, which is used by the
-  tests alone. Neither agenttool release changes the root package this
-  module imports, and no API of this module changes with them.
 - Added: `Skill.Instructions` returns the text the skill tool serves
   for a read of a skill's instructions, whose SHA-256 is the
   `Read.SHA256` the read records. `Skill.FrontmatterSHA256` is the
@@ -42,6 +38,10 @@ versions may break the API.
   unknown tool name rather than a grant of bare `Bash` that
   agentpolicy's parser does not read. The tests run agentpolicy
   v0.0.9's `testdata/policy/grammar.json`. (#29)
+- Dependencies: agenttool v0.0.12 to v0.0.14, which agentturn v0.0.15
+  requires, and agentturn v0.0.13 to v0.0.15, which is used by the
+  tests alone. Neither agenttool release changes the root package this
+  module imports, and no API of this module changes with them.
 
 ## v0.0.9 - 2026-10-01
 
