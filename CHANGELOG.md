@@ -7,6 +7,10 @@ versions may break the API.
 
 ## Unreleased
 
+- Documentation: `docs/source.md` restates the parts of the Agent
+  Skills specification and client guide this module relies on. It also
+  states what they leave out: a source as three operations, the path
+  rules, and the symlink guard as a MUST for any reader. (#9)
 - Changed: `Discover` finds a skill file by listing the directory and
   comparing names exactly, as `Load` has since v0.0.3, rather than
   probing with `fs.Stat`. A directory whose skill file is `Skill.md`,

@@ -61,7 +61,9 @@ skill that was and a replay serving other bytes is detectable.
   serves, and `Lookup` and `Names` agree with it.
 - `Dir(path)` is the source for a local directory, with one guard
   `os.DirFS` lacks: a symlink resolving outside the directory is
-  refused.
+  refused. [docs/source.md](docs/source.md) states the source, its
+  path rules and that guard for an implementation in any language,
+  beside the parts of the specification they rest on.
 - `Files`, `Open` and `Rules` reach a skill's resources and its parsed
   `allowed-tools`; enforcement is the host's. A token that opens a
   specifier and supplies none, `Bash()`, is refused rather than parsed
@@ -114,3 +116,9 @@ make interop  # needs uvx and the network
 
 Golden outputs live under `testdata/golden`; regenerate with `go test
 . -update` and review the diff.
+
+## License
+
+MIT; see [LICENSE](LICENSE). [NOTICE](NOTICE) credits the Agent Skills
+project, whose specification (CC BY 4.0) `docs/source.md` quotes and
+whose reference library (Apache 2.0) `Validate` and `Prompt` match.
