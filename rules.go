@@ -3,7 +3,6 @@ package agentskill
 import (
 	"fmt"
 	"strings"
-	"unicode"
 )
 
 // ToolRule is one token of allowed-tools: a tool name, or a name with
@@ -32,7 +31,8 @@ func (r ToolRule) String() string {
 func (r ToolRule) Matches(toolName string) bool { return r.Tool == toolName }
 
 // Rules parses AllowedTools into one [ToolRule] per token. Tokens are
-// separated by whitespace outside parentheses, so a specifier may hold
+// separated by ASCII whitespace (space, tab, line feed, vertical tab,
+// form feed, carriage return) outside parentheses, so a specifier may hold
 // spaces; unbalanced parentheses are an error, because the token
 // cannot then be delimited. An empty field yields no rules and no
 // error.
@@ -62,6 +62,19 @@ func (s *Skill) Rules() ([]ToolRule, error) {
 	return rules, nil
 }
 
+// isSpace reports whether r separates tokens: the six ASCII whitespace
+// characters and no other, as agentpolicy's grammar says. A no-break
+// space or any other Unicode space is part of a token, so text pasted
+// from a rendered page reads as one unknown tool name rather than as
+// two tools, and both parsers grant the same thing.
+func isSpace(r rune) bool {
+	switch r {
+	case ' ', '\t', '\n', '\v', '\f', '\r':
+		return true
+	}
+	return false
+}
+
 // splitRules cuts the field at whitespace outside parentheses. A
 // closing parenthesis with no open one, or an open one never closed,
 // is reported with the token it belongs to.
@@ -69,7 +82,7 @@ func splitRules(s string) ([]string, error) {
 	var tokens []string
 	depth, start := 0, -1
 	for i, r := range s {
-		if depth == 0 && unicode.IsSpace(r) {
+		if depth == 0 && isSpace(r) {
 			if start >= 0 {
 				tokens = append(tokens, s[start:i])
 				start = -1

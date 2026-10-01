@@ -5,6 +5,16 @@ All user-visible changes to this library. The format follows
 uses [Semantic Versioning](https://semver.org/); before v1.0.0 minor
 versions may break the API.
 
+## Unreleased
+
+- Changed: `Skill.Rules` separates `allowed-tools` tokens only at the
+  six ASCII whitespace characters, as agentpolicy's RFC 0001 grammar
+  does. A no-break space or any other Unicode space is now part of a
+  token, so `Read<NBSP>Bash`, pasted from a rendered page, is one
+  unknown tool name rather than a grant of bare `Bash` that
+  agentpolicy's parser does not read. The tests run agentpolicy
+  v0.0.9's `testdata/policy/grammar.json`. (#29)
+
 ## v0.0.9 - 2026-10-01
 
 - Documentation: `docs/source.md` restates the parts of the Agent
