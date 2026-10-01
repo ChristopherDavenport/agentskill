@@ -5,6 +5,16 @@ All user-visible changes to this library. The format follows
 uses [Semantic Versioning](https://semver.org/); before v1.0.0 minor
 versions may break the API.
 
+## Unreleased
+
+- Changed: the skill tool serves a path naming the skill file,
+  `SKILL.md` in any case, as the skill's instructions: the body and
+  file list, recorded as a `Read` with no `Path`. It used to serve the
+  whole file, frontmatter included, recorded as a file read, so a host
+  that grants `allowed-tools` on a read of the instructions, as
+  agentkit does, granted nothing to a model that asked for the
+  instructions by that name. (#30)
+
 ## v0.0.9 - 2026-10-01
 
 - Documentation: `docs/source.md` restates the parts of the Agent

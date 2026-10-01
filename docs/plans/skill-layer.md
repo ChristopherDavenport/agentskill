@@ -254,6 +254,11 @@ one tool serves text and images:
 - The body call returns the Markdown body, then a `files:` section
   listing every path with its size, so the model can pick without
   guessing.
+- A path naming the skill file, `SKILL.md` in any case, is the body
+  call and is recorded as one, with no path. Models know a skill's
+  instructions as `SKILL.md` and ask for it by path; a host that grants
+  `allowed-tools` on a read of the instructions must see the read as
+  one, and the frontmatter is never served.
 - A file with a text media type, by extension and by a sniff of the
   first bytes, returns as text.
 - An image returns as an image content part.
