@@ -7,6 +7,13 @@ versions may break the API.
 
 ## Unreleased
 
+- Changed: the skill tool serves a path naming the skill file,
+  `SKILL.md` in any case, as the skill's instructions: the body and
+  file list, recorded as a `Read` with no `Path`. It used to serve the
+  whole file, frontmatter included, recorded as a file read, so a host
+  that grants `allowed-tools` on a read of the instructions, as
+  agentkit does, granted nothing to a model that asked for the
+  instructions by that name. (#30)
 - Changed: `Skill.Rules` separates `allowed-tools` tokens only at the
   six ASCII whitespace characters, as agentpolicy's RFC 0001 grammar
   does. A no-break space or any other Unicode space is now part of a

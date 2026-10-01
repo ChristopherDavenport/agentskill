@@ -58,7 +58,9 @@ type Read struct {
 	// Location is the skill's Location: the SKILL.md that was read.
 	Location string `json:"location"`
 	// Path is the file inside the skill that was served, "" for a read
-	// of the skill's own instructions.
+	// of the skill's own instructions. A call whose path names the
+	// skill file, "SKILL.md" in any case, is a read of the
+	// instructions and is recorded with "".
 	Path string `json:"path,omitempty"`
 	// Bytes is the number of bytes served.
 	Bytes int `json:"bytes"`
@@ -85,7 +87,11 @@ type toolArgs struct {
 // image as an image part, anything else refused with its size and
 // detected type. An unknown skill is an error listing the names the
 // model could have used; an unknown path is an error listing the
-// files.
+// files. A path naming the skill file itself, "SKILL.md" in any case,
+// is served as the instructions, not as a file: models know a skill's
+// instructions as SKILL.md and ask for it by path, and a host that
+// grants allowed-tools on a read of the instructions must see that read
+// as one, while the frontmatter stays out of the reply.
 //
 // Everything the tool returns is bytes from the source, framed, never
 // transformed, so the transcript records exactly what the model read.
@@ -115,6 +121,9 @@ func (c *Catalog) Tool(opts ...ToolOption) agenttool.Tool {
 				served []byte
 				err    error
 			)
+			if isSkillFileName(a.Path) {
+				a.Path = ""
+			}
 			if a.Path == "" {
 				parts, served, err = body(s)
 			} else {
@@ -134,6 +143,13 @@ func (c *Catalog) Tool(opts ...ToolOption) agenttool.Tool {
 			}
 			return res, nil
 		})
+}
+
+// isSkillFileName reports whether p names the skill file at the root,
+// in any case. Case is folded because on a case-insensitive file system
+// "Skill.md" opens the same file.
+func isSkillFileName(p string) bool {
+	return strings.EqualFold(p, "SKILL.md")
 }
 
 // body renders the skill's Markdown followed by its file list, and
