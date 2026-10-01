@@ -268,15 +268,19 @@ one tool serves text and images:
 - The body call reads the skill file again, as a file read reads its
   file, so a reply never sets the body from discovery beside the file
   list from now. A skill edited after discovery serves its new body.
-  If the skill file is gone, renamed, or its frontmatter differs in
-  any byte, the call is refused with `ErrSkillChanged` until the product
-  discovers again: the listing and any `allowed-tools` grant came from
-  the old frontmatter.
+  When its frontmatter changed too, the body is still served, under
+  the frontmatter as loaded: the listing and any `allowed-tools` grant
+  stay the approved ones until the product discovers again, and the
+  `Read` sets `FrontmatterChanged`. A skill file that is gone, renamed
+  or no longer parses has no body to serve and is refused with
+  `ErrSkillChanged`.
 - `Skill.Instructions()` is the body call's text, exported, so a
   product that binds an approval to what the model reads computes the
   digest `Read.SHA256` will record without serving the skill. The text
   holds file sizes, so the digest moves when any file of the skill
-  does.
+  does. It does not hold the frontmatter, so it says nothing of the
+  grant: `Skill.FrontmatterSHA256()`, recorded on every `Read`, is the
+  digest of the frontmatter as loaded, and an approval binds to both.
 
 Because every activation and every read is a function call, the
 transcript and the session record which skills a run used and which
