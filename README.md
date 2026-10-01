@@ -116,3 +116,9 @@ make interop  # needs uvx and the network
 
 Golden outputs live under `testdata/golden`; regenerate with `go test
 . -update` and review the diff.
+
+## License
+
+MIT; see [LICENSE](LICENSE). [NOTICE](NOTICE) credits the Agent Skills
+project, whose specification (CC BY 4.0) `docs/source.md` quotes and
+whose reference library (Apache 2.0) `Validate` and `Prompt` match.

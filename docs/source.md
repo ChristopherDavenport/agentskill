@@ -19,6 +19,12 @@ and the [client implementation guide](https://agentskills.io/client-implementati
 as published on 2026-10-01. Where a document's words decide a question,
 they are quoted.
 
+The quoted and adapted material is from the
+[Agent Skills project](https://github.com/agentskills/agentskills),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+It is excerpted, and changed by the commentary on what this module does
+with each point. See [NOTICE](../NOTICE).
+
 **A skill is a directory.** "A skill is a directory containing, at
 minimum, a `SKILL.md` file". The `SKILL.md` "must contain YAML
 frontmatter followed by Markdown content". Beyond it, "a skill
@@ -153,6 +159,7 @@ symlinks, such as an `embed.FS`, a zip archive or an `fstest.MapFS`,
 needs no guard. A source over a remote store MUST apply the same rule
 to whatever the store has that can point outside a tree.
 
-Known gap: `Skill.Files` lists a link that the guard will refuse to
-read, so the tool offers a path it then refuses (#26). No content
-leaks; only the link's name is shown.
+A listing MUST NOT offer a path that reading refuses. `Skill.Files`
+lists a symlink only when it stats as a file, so a refused link, a
+dangling link and a link to a directory are left out. The tool's file
+list therefore holds only what it can serve (#26).

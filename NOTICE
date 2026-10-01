@@ -1,0 +1,32 @@
+agentskill
+Copyright (c) 2026 Christopher Davenport
+Licensed under the MIT License; see LICENSE.
+
+This module implements the Agent Skills format, published by the Agent
+Skills project at https://github.com/agentskills/agentskills. That
+project's code is licensed under the Apache License 2.0 and its
+documentation under Creative Commons Attribution 4.0 International
+(CC BY 4.0). It ships no NOTICE file of its own.
+
+Material from it used here:
+
+- docs/source.md quotes and restates parts of the Agent Skills
+  specification (https://agentskills.io/specification) and client
+  implementation guide
+  (https://agentskills.io/client-implementation/adding-skills-support),
+  as published on 2026-10-01. Excerpted and adapted; the quotations are
+  marked. CC BY 4.0, https://creativecommons.org/licenses/by/4.0/.
+
+- The validator's problem messages and the available_skills block
+  rendered by Catalog.Prompt reproduce the wording and output of the
+  reference library skills-ref 0.1.1
+  (https://github.com/agentskills/agentskills/tree/main/skills-ref),
+  so the two agree byte for byte. testdata/ref/golden holds what
+  skills-ref printed over this module's fixtures. Apache License 2.0,
+  https://www.apache.org/licenses/LICENSE-2.0.
+
+- Fixture skills under testdata use the specification's example
+  values (the pdf-processing name, author: example-org,
+  version: "1.0").
+
+No source code from the Agent Skills project is included.
