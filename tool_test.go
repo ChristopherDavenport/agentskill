@@ -94,7 +94,11 @@ func TestToolFiles(t *testing.T) {
 		{name: "text by extension", args: `{"name":"pdf-processing","path":"reference.md"}`, wantText: "# Reference\n\nThe pypdf API, in brief.\n"},
 		{name: "script", args: `{"name":"pdf-processing","path":"scripts/extract.py"}`, wantText: "import sys\nprint(sys.argv[1])\n"},
 		{name: "sniffed text", args: `{"name":"pdf-processing","path":"assets/notes"}`, wantText: "plain notes with no extension\n"},
-		{name: "the skill file itself", args: `{"name":"minimal","path":"SKILL.md"}`, wantText: "---\nname: minimal\ndescription: The smallest valid skill.\n---\nDo the minimal thing.\n"},
+		// The skill file is the instructions, without the frontmatter.
+		{name: "the skill file itself", args: `{"name":"minimal","path":"SKILL.md"}`, wantText: "Do the minimal thing.\n\nfiles: none\n"},
+		{name: "the skill file in lowercase", args: `{"name":"minimal","path":"skill.md"}`, wantText: "Do the minimal thing.\n\nfiles: none\n"},
+		{name: "the skill file in mixed case", args: `{"name":"minimal","path":"Skill.md"}`, wantText: "Do the minimal thing.\n\nfiles: none\n"},
+		{name: "a nested SKILL.md is not the skill file", args: `{"name":"pdf-processing","path":"scripts/SKILL.md"}`, wantErr: []string{`no file "scripts/SKILL.md"`}},
 		{name: "image", args: `{"name":"pdf-processing","path":"assets/logo.png"}`, wantImg: "data:image/png;base64,iVBORw0KGgo"},
 		{name: "binary refused", args: `{"name":"pdf-processing","path":"assets/blob.bin"}`, wantErr: []string{`"assets/blob.bin"`, "1024 bytes", "application/octet-stream"}},
 		{name: "unknown skill", args: `{"name":"nope"}`, wantErr: []string{`unknown skill "nope"`, "available skills: ", "pdf-processing", "minimal"}},
@@ -168,6 +172,16 @@ func TestToolRecordsWhatItServed(t *testing.T) {
 		{
 			name: "instructions",
 			args: `{"name":"pdf-processing"}`,
+			served: func(res agenttool.Result) []byte {
+				return []byte(res.Output.Parts[0].(*openresponses.InputText).Text)
+			},
+		},
+		{
+			// Models ask for the instructions as SKILL.md. The read is
+			// recorded as one of the instructions, with no path, so a
+			// host that grants allowed-tools on such a read grants them.
+			name: "instructions asked for as SKILL.md",
+			args: `{"name":"pdf-processing","path":"SKILL.md"}`,
 			served: func(res agenttool.Result) []byte {
 				return []byte(res.Output.Parts[0].(*openresponses.InputText).Text)
 			},
