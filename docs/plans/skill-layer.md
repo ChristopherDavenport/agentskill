@@ -297,10 +297,11 @@ func (r ToolRule) Matches(toolName string) bool
 ```
 
 The field is experimental in the specification and the specifier
-grammar is the product's. This module splits tokens at whitespace
-outside parentheses, so the specifier is passed through untouched, and
-matches on the tool name; a host wires `Rules` into `BeforeToolCall`
-however it likes.
+grammar is the product's. This module splits tokens at ASCII
+whitespace outside parentheses, as agentpolicy's RFC 0001 grammar
+does, so the specifier is passed through untouched, and matches on
+the tool name; a host wires `Rules` into `BeforeToolCall` however it
+likes.
 
 ### AGENTS.md
 

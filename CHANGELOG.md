@@ -14,6 +14,13 @@ versions may break the API.
   that grants `allowed-tools` on a read of the instructions, as
   agentkit does, granted nothing to a model that asked for the
   instructions by that name. (#30)
+- Changed: `Skill.Rules` separates `allowed-tools` tokens only at the
+  six ASCII whitespace characters, as agentpolicy's RFC 0001 grammar
+  does. A no-break space or any other Unicode space is now part of a
+  token, so `Read<NBSP>Bash`, pasted from a rendered page, is one
+  unknown tool name rather than a grant of bare `Bash` that
+  agentpolicy's parser does not read. The tests run agentpolicy
+  v0.0.9's `testdata/policy/grammar.json`. (#29)
 
 ## v0.0.9 - 2026-10-01
 
