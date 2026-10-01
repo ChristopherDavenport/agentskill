@@ -41,6 +41,14 @@ read sets a `Read` as the result's `Details`, which a recorder writes
 under `agentskill.RecordNS`: the name, the `SKILL.md` behind it, the
 path served and a sha256 of the bytes, so a session can say which
 skill that was and a replay serving other bytes is detectable.
+`Skill.Instructions` returns the text a read of the instructions
+serves, so a product can compute that digest itself, and
+`Skill.FrontmatterSHA256` the digest of the frontmatter its
+`allowed-tools` came from, recorded on each read too: an approval
+bound to both covers what the model reads and what it is granted. The
+tool reads the skill file at each call, so an edited body is served
+as it now is. Edited frontmatter takes effect only when the product
+discovers again; until then the read says the catalogue is stale.
 
 ## Skills
 

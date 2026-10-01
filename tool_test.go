@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -210,12 +211,19 @@ func TestToolRecordsWhatItServed(t *testing.T) {
 			}
 			served := tt.served(res)
 			sum := sha256.Sum256(served)
+			front, _, err := splitFrontmatter(onDisk("SKILL.md"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			frontSum := sha256.Sum256(front)
 			want := Read{
 				Name:     "pdf-processing",
 				Location: dir + "/pdf-processing/SKILL.md",
 				Path:     tt.wantPath,
 				Bytes:    len(served),
 				SHA256:   hex.EncodeToString(sum[:]),
+
+				FrontmatterSHA256: hex.EncodeToString(frontSum[:]),
 			}
 			if read != want {
 				t.Errorf("Details = %+v, want %+v", read, want)
@@ -295,5 +303,212 @@ func TestDetect(t *testing.T) {
 				t.Errorf("detect() = %v, %q; want %v, %q", kind, typ, tt.kind, tt.typ)
 			}
 		})
+	}
+}
+
+// TestToolServesTheSkillAsItIsNow: a product whose agent improves its
+// own skills edits them after discovery. A read used to serve the body
+// from discovery beside the file list from now, a text that never
+// existed on disk. The tool reads the skill file at the call and serves
+// the body on disk. New frontmatter does not stop the read: the skill
+// keeps the fields it was loaded with, so the grant stays the one
+// approved, and the Read says the catalogue is stale. Only a skill file
+// with no body to serve is refused.
+func TestToolServesTheSkillAsItIsNow(t *testing.T) {
+	const original = "---\nname: deploy\ndescription: Deploys.\nallowed-tools: bash(kubectl:*)\n---\nStep one: the old way.\n"
+	tests := []struct {
+		name        string
+		edit        func(t *testing.T, dir string)
+		want        string
+		wantChanged bool
+		wantErr     string
+	}{
+		{
+			name: "unchanged",
+			edit: func(*testing.T, string) {},
+			want: "Step one: the old way.\n\nfiles: none\n",
+		},
+		{
+			name: "new body and a new file",
+			edit: func(t *testing.T, dir string) {
+				writeFile(t, filepath.Join(dir, "SKILL.md"), strings.Replace(original, "old way", "new way", 1))
+				writeFile(t, filepath.Join(dir, "references", "pitfalls.md"), "Not the old way.\n")
+			},
+			want: "Step one: the new way.\n\nfiles:\n- references/pitfalls.md (17 bytes)\n",
+		},
+		{
+			name: "widened allowed-tools and a new body",
+			edit: func(t *testing.T, dir string) {
+				edited := strings.Replace(original, "bash(kubectl:*)", "bash(*)", 1)
+				writeFile(t, filepath.Join(dir, "SKILL.md"), strings.Replace(edited, "old way", "new way", 1))
+			},
+			want:        "Step one: the new way.\n\nfiles: none\n",
+			wantChanged: true,
+		},
+		{
+			name: "frontmatter no longer closed",
+			edit: func(t *testing.T, dir string) {
+				writeFile(t, filepath.Join(dir, "SKILL.md"), "---\nname: deploy\n")
+			},
+			wantErr: "frontmatter not properly closed",
+		},
+		{
+			name: "skill file removed",
+			edit: func(t *testing.T, dir string) {
+				if err := os.Remove(filepath.Join(dir, "SKILL.md")); err != nil {
+					t.Fatal(err)
+				}
+			},
+			wantErr: "SKILL.md is gone",
+		},
+		{
+			name: "skill file renamed",
+			edit: func(t *testing.T, dir string) {
+				if err := os.Rename(filepath.Join(dir, "SKILL.md"), filepath.Join(dir, "skill.md")); err != nil {
+					t.Fatal(err)
+				}
+			},
+			wantErr: "the skill file is now skill.md, not SKILL.md",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := t.TempDir()
+			dir := filepath.Join(root, "deploy")
+			writeFile(t, filepath.Join(dir, "SKILL.md"), original)
+			c, err := DiscoverDirs(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			s, _ := c.Lookup("deploy")
+			loaded := s.FrontmatterSHA256()
+			tt.edit(t, dir)
+
+			res, err := c.Tool().Execute(context.Background(), agenttool.Call{ID: "c1", Args: json.RawMessage(`{"name":"deploy"}`)})
+			text, ierr := s.Instructions()
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("served %q, want an error", res.Output.Parts[0].(*openresponses.InputText).Text)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Errorf("error = %q, want it to contain %q", err, tt.wantErr)
+				}
+				if !errors.Is(ierr, ErrSkillChanged) {
+					t.Errorf("Instructions() error = %v, want ErrSkillChanged", ierr)
+				}
+				if res.Details != nil {
+					t.Errorf("Details = %#v, want none", res.Details)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := res.Output.Parts[0].(*openresponses.InputText).Text; got != tt.want {
+				t.Errorf("served %q, want %q", got, tt.want)
+			}
+			if ierr != nil || text != tt.want {
+				t.Errorf("Instructions() = %q, %v; want %q", text, ierr, tt.want)
+			}
+			read := res.Details.(Read)
+			if read.FrontmatterChanged != tt.wantChanged {
+				t.Errorf("FrontmatterChanged = %v, want %v", read.FrontmatterChanged, tt.wantChanged)
+			}
+			// The grant is the one loaded, whatever the file now says.
+			if read.FrontmatterSHA256 != loaded || s.FrontmatterSHA256() != loaded {
+				t.Errorf("FrontmatterSHA256 = %s, skill says %s, want the loaded %s", read.FrontmatterSHA256, s.FrontmatterSHA256(), loaded)
+			}
+			if rules, err := s.Rules(); err != nil || len(rules) != 1 || rules[0].String() != "bash(kubectl:*)" {
+				t.Errorf("Rules() = %v, %v; want the loaded bash(kubectl:*)", rules, err)
+			}
+		})
+	}
+}
+
+// TestInstructionsDigestIsTheRecordedOne: a product binds an approval
+// to what the model reads, and the session records Read.SHA256. Both
+// must name one digest, computed from Skill.Instructions without
+// serving the skill through the tool.
+func TestInstructionsDigestIsTheRecordedOne(t *testing.T) {
+	c := fixtureCatalog(t)
+	tool := c.Tool()
+	for _, name := range c.Names() {
+		t.Run(name, func(t *testing.T) {
+			s, _ := c.Lookup(name)
+			text, err := s.Instructions()
+			if err != nil {
+				t.Fatal(err)
+			}
+			sum := sha256.Sum256([]byte(text))
+			args, _ := json.Marshal(toolArgs{Name: name})
+			res, err := tool.Execute(context.Background(), agenttool.Call{ID: "c1", Args: args})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := res.Details.(Read).SHA256; got != hex.EncodeToString(sum[:]) {
+				t.Errorf("recorded %s, Instructions hashes to %x", got, sum)
+			}
+		})
+	}
+}
+
+// TestApprovalCoversTheGrant is #32's scenario. The user approves a
+// skill whose allowed-tools is bash(kubectl:*); a reviewer rewrites it
+// to bash(*) and leaves the body alone; the product discovers again.
+// The instructions digest cannot tell the two apart, since the model
+// reads the same text. The frontmatter digest can, so an approval bound
+// to both refuses the wider grant.
+func TestApprovalCoversTheGrant(t *testing.T) {
+	const original = "---\nname: deploy\ndescription: Deploys.\nallowed-tools: bash(kubectl:*)\n---\nDeploy with kubectl.\n"
+	root := t.TempDir()
+	file := filepath.Join(root, "deploy", "SKILL.md")
+	writeFile(t, file, original)
+	digests := func() (instructions, frontmatter string) {
+		t.Helper()
+		c, err := DiscoverDirs(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		s, _ := c.Lookup("deploy")
+		text, err := s.Instructions()
+		if err != nil {
+			t.Fatal(err)
+		}
+		sum := sha256.Sum256([]byte(text))
+		return hex.EncodeToString(sum[:]), s.FrontmatterSHA256()
+	}
+	approvedText, approvedFront := digests()
+	writeFile(t, file, strings.Replace(original, "bash(kubectl:*)", "bash(*)", 1))
+	text, front := digests()
+	if text != approvedText {
+		t.Errorf("instructions digest moved (%s to %s) though the body did not", approvedText, text)
+	}
+	if front == approvedFront {
+		t.Errorf("frontmatter digest %s did not move when allowed-tools widened", front)
+	}
+}
+
+// A skill Load did not build serves its Body, with no files.
+func TestInstructionsOfAParsedSkill(t *testing.T) {
+	s, err := Parse([]byte("---\nname: a\ndescription: d\n---\nBody."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.Instructions()
+	if err != nil || got != "Body.\n\nfiles: none\n" {
+		t.Errorf("Instructions() = %q, %v", got, err)
+	}
+	if d := s.FrontmatterSHA256(); d != "" {
+		t.Errorf("FrontmatterSHA256() = %q, want none", d)
+	}
+}
+
+func writeFile(t *testing.T, name, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(name), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(name, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }

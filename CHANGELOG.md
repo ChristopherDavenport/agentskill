@@ -7,6 +7,23 @@ versions may break the API.
 
 ## Unreleased
 
+- Added: `Skill.Instructions` returns the text the skill tool serves
+  for a read of a skill's instructions, whose SHA-256 is the
+  `Read.SHA256` the read records. `Skill.FrontmatterSHA256` is the
+  digest of the frontmatter the skill was loaded from, which every
+  `Read` now records as `FrontmatterSHA256`. A product can bind an
+  approval to both without serving the skill through the tool, so a
+  rewrite of `allowed-tools` that leaves the body alone no longer
+  matches it. (#32)
+- Changed: the skill tool reads the skill file at each call rather
+  than serving the body from discovery. A reply used to put that body
+  beside the file list as it is now, a text that had never been on
+  disk. An edited body is now served as it is. When the frontmatter
+  changed too, the body is served under the frontmatter as loaded,
+  so the listing and any grant stay the ones approved until the
+  product discovers again, and the `Read` sets `FrontmatterChanged`. A
+  skill file that is gone, renamed or no longer parses is refused with
+  the new `ErrSkillChanged`. `Skill.Body` stays as loaded. (#31)
 - Changed: the skill tool serves a path naming the skill file,
   `SKILL.md` in any case, as the skill's instructions: the body and
   file list, recorded as a `Read` with no `Path`. It used to serve the

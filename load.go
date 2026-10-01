@@ -43,6 +43,9 @@ func Load(fsys fs.FS, location string) (*Skill, error) {
 		return nil, err
 	}
 	s.FS = fsys
+	// Parse succeeded, so the fence splits.
+	s.file = file
+	s.front, _, _ = splitFrontmatter(src)
 	s.Location = joinLocation(location, file)
 	s.DirName = baseName(location)
 	return s, nil
