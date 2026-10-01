@@ -5,7 +5,7 @@ All user-visible changes to this library. The format follows
 uses [Semantic Versioning](https://semver.org/); before v1.0.0 minor
 versions may break the API.
 
-## Unreleased
+## v0.0.10 - 2026-10-01
 
 - Added: `Skill.Instructions` returns the text the skill tool serves
   for a read of a skill's instructions, whose SHA-256 is the
