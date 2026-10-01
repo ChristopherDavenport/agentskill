@@ -11,6 +11,21 @@ versions may break the API.
   Skills specification and client guide this module relies on. It also
   states what they leave out: a source as three operations, the path
   rules, and the symlink guard as a MUST for any reader. (#9)
+- Changed: `Discover` finds a skill file by listing the directory and
+  comparing names exactly, as `Load` has since v0.0.3, rather than
+  probing with `fs.Stat`. A directory whose skill file is `Skill.md`,
+  `SKILL.MD` or any other case of `SKILL.md` but the two the format
+  accepts is now skipped on every host. On a case-insensitive file
+  system, macOS's or Windows', it used to come up as a load error
+  keyed under a `SKILL.md` that did not exist, while Linux skipped it
+  silently. Either way it now has a `Warning` in `Catalog.Problems`
+  under the file's real name, saying the file must be named
+  `SKILL.md`. (#11)
+- Fixed: `Skill.Files` lists a symlink only when it stats as a file,
+  so the skill tool offers only paths it can serve. Under `Dir`, a link
+  leading outside the skill was listed and then refused when read, and
+  a link to a directory was listed as a file. Such links, dangling ones
+  and links to a directory inside the skill are now left out. (#26)
 - Dependencies: agenttool v0.0.11 to v0.0.12, and agentturn v0.0.12 to
   v0.0.13, which is used by the tests alone. No API of this module
   changes with them.

@@ -167,6 +167,12 @@ func TestDirSymlinkGuard(t *testing.T) {
 	if err := os.Symlink(skill, filepath.Join(root, "alias")); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.Symlink(filepath.Join(skill, "sub"), filepath.Join(skill, "subdir")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(skill, "gone.md"), filepath.Join(skill, "dangling.md")); err != nil {
+		t.Fatal(err)
+	}
 
 	c, err := DiscoverDirs(root)
 	if err != nil {
@@ -217,8 +223,10 @@ func TestDirSymlinkGuard(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Files lists what is there, links included; opening decides.
-	want := []string{"escape.md", "escapedir", "ok.md", "sub/inside.md"}
+	// Files lists what Open serves: the link inside is a file, the link
+	// to a file outside, the link to a directory outside, the link to a
+	// directory inside and the dangling link are not (#26).
+	want := []string{"ok.md", "sub/inside.md"}
 	if len(files) != len(want) {
 		t.Fatalf("Files() = %v, want %v", files, want)
 	}
