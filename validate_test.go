@@ -118,6 +118,13 @@ func TestRules(t *testing.T) {
 		},
 		{in: "Edit(./Finance (2024)/**)  Read", want: []ToolRule{{Tool: "Edit", Spec: "./Finance (2024)/**"}, {Tool: "Read"}}},
 		{in: "Bash( a  b )", want: []ToolRule{{Tool: "Bash", Spec: " a  b "}}},
+		// Only ASCII whitespace separates, as in agentpolicy's grammar:
+		// a no-break space, NEL or em space is part of the token, so a
+		// pasted "Read<NBSP>Bash" never grants Bash.
+		{in: "Read\u00a0Bash", want: []ToolRule{{Tool: "Read\u00a0Bash"}}},
+		{in: "Read\u0085Bash", want: []ToolRule{{Tool: "Read\u0085Bash"}}},
+		{in: "Read\u2003Bash Write", want: []ToolRule{{Tool: "Read\u2003Bash"}, {Tool: "Write"}}},
+		{in: "Read\vEdit\fWrite\rGrep", want: []ToolRule{{Tool: "Read"}, {Tool: "Edit"}, {Tool: "Write"}, {Tool: "Grep"}}},
 		{in: "(x)", err: `allowed-tools token "(x)": missing tool name`},
 		{in: "Bash(x", err: `allowed-tools token "Bash(x": unmatched parenthesis`},
 		{in: "Bash(git add *", err: `allowed-tools token "Bash(git add *": unmatched parenthesis`},
