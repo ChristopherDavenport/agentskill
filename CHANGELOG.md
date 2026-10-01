@@ -17,6 +17,11 @@ versions may break the API.
   silently. Either way it now has a `Warning` in `Catalog.Problems`
   under the file's real name, saying the file must be named
   `SKILL.md`. (#11)
+- Fixed: `Skill.Files` lists a symlink only when it stats as a file,
+  so the skill tool offers only paths it can serve. Under `Dir`, a link
+  leading outside the skill was listed and then refused when read, and
+  a link to a directory was listed as a file. Such links, dangling ones
+  and links to a directory inside the skill are now left out. (#26)
 - Dependencies: agenttool v0.0.11 to v0.0.12, and agentturn v0.0.12 to
   v0.0.13, which is used by the tests alone. No API of this module
   changes with them.

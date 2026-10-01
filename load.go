@@ -144,6 +144,11 @@ func baseName(location string) string {
 // Files lists every file in the skill's tree except the skill file
 // itself, as fs paths relative to the skill's root, sorted. A skill
 // with no FS has no files.
+//
+// A symlink is listed only when it stats as a file, so the list holds
+// only what [Skill.Open] can serve. A link the source refuses, as
+// [Dir] refuses one leading outside, a dangling link and a link to a
+// directory, which the walk does not enter, are left out.
 func (s *Skill) Files() ([]string, error) {
 	if s.FS == nil {
 		return nil, nil
@@ -158,6 +163,11 @@ func (s *Skill) Files() ([]string, error) {
 		}
 		if isSkillFile(p) {
 			return nil
+		}
+		if d.Type()&fs.ModeSymlink != 0 {
+			if info, err := fs.Stat(s.FS, p); err != nil || info.IsDir() {
+				return nil
+			}
 		}
 		files = append(files, p)
 		return nil
