@@ -62,9 +62,10 @@ type Read struct {
 	Path string `json:"path,omitempty"`
 	// Bytes is the number of bytes served.
 	Bytes int `json:"bytes"`
-	// SHA256 is the hex digest of the bytes served: the text of the
-	// reply for a read of the instructions, and the file's own bytes
-	// for a file, before an image is base64 encoded into its part.
+	// SHA256 is the hex digest of the bytes served: for a read of the
+	// instructions the text of the reply, which [Skill.Instructions]
+	// returns, and for a file its own bytes, before an image is base64
+	// encoded into its part.
 	SHA256 string `json:"sha256"`
 }
 
@@ -89,6 +90,10 @@ type toolArgs struct {
 //
 // Everything the tool returns is bytes from the source, framed, never
 // transformed, so the transcript records exactly what the model read.
+// The instructions are read from the skill file at the call, as the
+// files are, so a reply never puts a body from discovery beside a file
+// list from now; a skill whose frontmatter changed since discovery is
+// refused, with [ErrSkillChanged], until the product discovers again.
 //
 // The tool serves the skills [Catalog.Listed] offers, which are the
 // ones [Catalog.Prompt] renders, so the model can fetch everything it
@@ -116,7 +121,10 @@ func (c *Catalog) Tool(opts ...ToolOption) agenttool.Tool {
 				err    error
 			)
 			if a.Path == "" {
-				parts, served, err = body(s)
+				var text string
+				text, err = s.Instructions()
+				served = []byte(text)
+				parts = openresponses.Contents{&openresponses.InputText{Text: text}}
 			} else {
 				parts, served, err = file(s, a.Path, o.maxBytes)
 			}
@@ -136,16 +144,46 @@ func (c *Catalog) Tool(opts ...ToolOption) agenttool.Tool {
 		})
 }
 
-// body renders the skill's Markdown followed by its file list, and
-// returns the bytes served beside the part that carries them.
-func body(s *Skill) (openresponses.Contents, []byte, error) {
+// ErrSkillChanged is returned by [Skill.Instructions], and so by the
+// skill tool, when the skill file is no longer the one [Load] read: it
+// is gone, it is now spelled otherwise, or its frontmatter differs.
+// The frontmatter is what the catalogue was built from, its name and
+// description in the prompt and its allowed-tools in whatever a host
+// granted, so serving a new one under the old listing would make the
+// listing a lie. The product discovers the skills again.
+var ErrSkillChanged = errors.New("the skill file changed since the skills were discovered")
+
+// Instructions returns the text the skill tool serves for a read of
+// the skill's instructions: the Markdown body followed by the list of
+// the skill's files with their sizes. [Read.SHA256] for such a read is
+// the hex SHA-256 of this text, so a product that binds an approval to
+// what the model reads computes the digest the session will record:
+//
+//	text, err := s.Instructions()
+//	sum := sha256.Sum256([]byte(text))
+//	digest := hex.EncodeToString(sum[:])
+//
+// The text is read now, not at discovery: a skill [Load] read has its
+// skill file read again, and the body served is the body on disk. When
+// the file is gone, renamed or holds other frontmatter, Instructions
+// returns an error wrapping [ErrSkillChanged]; only the body may change
+// under a loaded skill. A skill Load did not build serves [Skill.Body].
+//
+// The file list carries sizes, so the digest changes when any of the
+// skill's files is added, removed or resized: the model reads those
+// too.
+func (s *Skill) Instructions() (string, error) {
+	body, err := s.currentBody()
+	if err != nil {
+		return "", err
+	}
 	files, err := s.Files()
 	if err != nil {
-		return nil, nil, err
+		return "", err
 	}
 	var b strings.Builder
-	b.WriteString(s.Body)
-	if !strings.HasSuffix(s.Body, "\n") {
+	b.WriteString(body)
+	if !strings.HasSuffix(body, "\n") {
 		b.WriteString("\n")
 	}
 	b.WriteString("\nfiles:")
@@ -162,8 +200,30 @@ func body(s *Skill) (openresponses.Contents, []byte, error) {
 			b.WriteString("\n")
 		}
 	}
-	text := b.String()
-	return openresponses.Contents{&openresponses.InputText{Text: text}}, []byte(text), nil
+	return b.String(), nil
+}
+
+// currentBody reads the skill file again and returns its body, when it
+// is still the file Load read with the same frontmatter.
+func (s *Skill) currentBody() (string, error) {
+	if s.FS == nil || s.file == "" {
+		return s.Body, nil
+	}
+	file, src, err := readSkillFile(s.FS)
+	if errors.Is(err, ErrNoSkillFile) {
+		return "", fmt.Errorf("skill %q: %w: %s is gone; discover the skills again", s.ListedName(), ErrSkillChanged, s.Location)
+	}
+	if err != nil {
+		return "", err
+	}
+	if file != s.file {
+		return "", fmt.Errorf("skill %q: %w: the skill file is now %s, not %s; discover the skills again", s.ListedName(), ErrSkillChanged, file, s.file)
+	}
+	front, body, err := splitFrontmatter(src)
+	if err != nil || !bytes.Equal(front, s.front) {
+		return "", fmt.Errorf("skill %q: %w: the frontmatter of %s differs; discover the skills again", s.ListedName(), ErrSkillChanged, s.Location)
+	}
+	return body, nil
 }
 
 // file returns one resource file as text or an image, with the file's

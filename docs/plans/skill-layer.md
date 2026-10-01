@@ -265,13 +265,26 @@ one tool serves text and images:
   tool.
 - An unknown skill name is an error listing the names the model could
   have used. An unknown path is an error listing the files.
+- The body call reads the skill file again, as a file read reads its
+  file, so a reply never sets the body from discovery beside the file
+  list from now. A skill edited after discovery serves its new body.
+  If the skill file is gone, renamed, or its frontmatter differs in
+  any byte, the call is refused with `ErrSkillChanged` until the product
+  discovers again: the listing and any `allowed-tools` grant came from
+  the old frontmatter.
+- `Skill.Instructions()` is the body call's text, exported, so a
+  product that binds an approval to what the model reads computes the
+  digest `Read.SHA256` will record without serving the skill. The text
+  holds file sizes, so the digest moves when any file of the skill
+  does.
 
 Because every activation and every read is a function call, the
 transcript and the session record which skills a run used and which
 files it opened, without a new entry or item type.
 
 The tool is the default, not the only way. A product that prefers to
-inject a body through `Transform` reads `Skill.Body` itself, and a
+inject a body through `Transform` reads `Skill.Instructions()`, or
+`Skill.Body` as it was at discovery, and a
 product with a general read tool can let the model read a local
 skill's files directly; the location in the prompt is an absolute path
 for that reason.

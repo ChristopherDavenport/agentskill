@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -281,5 +282,156 @@ func TestDetect(t *testing.T) {
 				t.Errorf("detect() = %v, %q; want %v, %q", kind, typ, tt.kind, tt.typ)
 			}
 		})
+	}
+}
+
+// TestToolServesTheSkillAsItIsNow: a product whose agent improves its
+// own skills edits them after discovery. A read used to serve the body
+// from discovery beside the file list from now, a text that never
+// existed on disk. The tool reads the skill file at the call: a new
+// body is served, and new frontmatter is refused until the product
+// discovers again, since the listing and any grant came from the old.
+func TestToolServesTheSkillAsItIsNow(t *testing.T) {
+	const original = "---\nname: deploy\ndescription: Deploys.\nallowed-tools: bash(kubectl:*)\n---\nStep one: the old way.\n"
+	tests := []struct {
+		name    string
+		edit    func(t *testing.T, dir string)
+		want    string
+		wantErr string
+	}{
+		{
+			name: "unchanged",
+			edit: func(*testing.T, string) {},
+			want: "Step one: the old way.\n\nfiles: none\n",
+		},
+		{
+			name: "new body and a new file",
+			edit: func(t *testing.T, dir string) {
+				writeFile(t, filepath.Join(dir, "SKILL.md"), strings.Replace(original, "old way", "new way", 1))
+				writeFile(t, filepath.Join(dir, "references", "pitfalls.md"), "Not the old way.\n")
+			},
+			want: "Step one: the new way.\n\nfiles:\n- references/pitfalls.md (17 bytes)\n",
+		},
+		{
+			name: "widened allowed-tools",
+			edit: func(t *testing.T, dir string) {
+				writeFile(t, filepath.Join(dir, "SKILL.md"), strings.Replace(original, "bash(kubectl:*)", "bash(*)", 1))
+			},
+			wantErr: `skill "deploy": the skill file changed since the skills were discovered: the frontmatter of`,
+		},
+		{
+			name: "frontmatter no longer closed",
+			edit: func(t *testing.T, dir string) {
+				writeFile(t, filepath.Join(dir, "SKILL.md"), "---\nname: deploy\n")
+			},
+			wantErr: "the frontmatter of",
+		},
+		{
+			name: "skill file removed",
+			edit: func(t *testing.T, dir string) {
+				if err := os.Remove(filepath.Join(dir, "SKILL.md")); err != nil {
+					t.Fatal(err)
+				}
+			},
+			wantErr: "SKILL.md is gone",
+		},
+		{
+			name: "skill file renamed",
+			edit: func(t *testing.T, dir string) {
+				if err := os.Rename(filepath.Join(dir, "SKILL.md"), filepath.Join(dir, "skill.md")); err != nil {
+					t.Fatal(err)
+				}
+			},
+			wantErr: "the skill file is now skill.md, not SKILL.md",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := t.TempDir()
+			dir := filepath.Join(root, "deploy")
+			writeFile(t, filepath.Join(dir, "SKILL.md"), original)
+			c, err := DiscoverDirs(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tt.edit(t, dir)
+
+			res, err := c.Tool().Execute(context.Background(), agenttool.Call{ID: "c1", Args: json.RawMessage(`{"name":"deploy"}`)})
+			s, _ := c.Lookup("deploy")
+			text, ierr := s.Instructions()
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("served %q, want an error", res.Output.Parts[0].(*openresponses.InputText).Text)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Errorf("error = %q, want it to contain %q", err, tt.wantErr)
+				}
+				if !errors.Is(ierr, ErrSkillChanged) {
+					t.Errorf("Instructions() error = %v, want ErrSkillChanged", ierr)
+				}
+				if res.Details != nil {
+					t.Errorf("Details = %#v, want none", res.Details)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := res.Output.Parts[0].(*openresponses.InputText).Text; got != tt.want {
+				t.Errorf("served %q, want %q", got, tt.want)
+			}
+			if ierr != nil || text != tt.want {
+				t.Errorf("Instructions() = %q, %v; want %q", text, ierr, tt.want)
+			}
+		})
+	}
+}
+
+// TestInstructionsDigestIsTheRecordedOne: a product binds an approval
+// to what the model reads, and the session records Read.SHA256. Both
+// must name one digest, computed from Skill.Instructions without
+// serving the skill through the tool.
+func TestInstructionsDigestIsTheRecordedOne(t *testing.T) {
+	c := fixtureCatalog(t)
+	tool := c.Tool()
+	for _, name := range c.Names() {
+		t.Run(name, func(t *testing.T) {
+			s, _ := c.Lookup(name)
+			text, err := s.Instructions()
+			if err != nil {
+				t.Fatal(err)
+			}
+			sum := sha256.Sum256([]byte(text))
+			args, _ := json.Marshal(toolArgs{Name: name})
+			res, err := tool.Execute(context.Background(), agenttool.Call{ID: "c1", Args: args})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := res.Details.(Read).SHA256; got != hex.EncodeToString(sum[:]) {
+				t.Errorf("recorded %s, Instructions hashes to %x", got, sum)
+			}
+		})
+	}
+}
+
+// A skill Load did not build serves its Body, with no files.
+func TestInstructionsOfAParsedSkill(t *testing.T) {
+	s, err := Parse([]byte("---\nname: a\ndescription: d\n---\nBody."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.Instructions()
+	if err != nil || got != "Body.\n\nfiles: none\n" {
+		t.Errorf("Instructions() = %q, %v", got, err)
+	}
+}
+
+func writeFile(t *testing.T, name, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(name), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(name, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }

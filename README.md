@@ -41,6 +41,12 @@ read sets a `Read` as the result's `Details`, which a recorder writes
 under `agentskill.RecordNS`: the name, the `SKILL.md` behind it, the
 path served and a sha256 of the bytes, so a session can say which
 skill that was and a replay serving other bytes is detectable.
+`Skill.Instructions` returns the text a read of the instructions
+serves, so a product can compute that digest itself, to bind an
+approval to what the model will read. The tool reads the skill file
+at each call: an edited body is served as it now is, and a skill whose
+frontmatter changed since discovery is refused with `ErrSkillChanged`
+until the product discovers again.
 
 ## Skills
 

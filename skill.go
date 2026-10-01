@@ -84,7 +84,9 @@ type Skill struct {
 	// as the reference validator rejects them.
 	Extra map[string]any
 
-	// Body is the Markdown after the frontmatter, verbatim.
+	// Body is the Markdown after the frontmatter, verbatim, as it was
+	// when the skill was loaded. [Skill.Instructions], which the skill
+	// tool serves, reads the skill file again.
 	Body string
 
 	// Qualifier is the source's [Source.Qualifier] when [Discover]
@@ -109,6 +111,13 @@ type Skill struct {
 	// reported by Validate, so a product can list the skill and say
 	// what is wrong with it.
 	shape []Problem
+	// file is the name of the skill file [Load] read, as spelled at
+	// the root of FS, and front is its frontmatter's bytes, so
+	// [Skill.Instructions] can tell whether the file it reads again is
+	// still the skill that was loaded. file is empty for a skill Load
+	// did not build.
+	file  string
+	front []byte
 }
 
 // Severity says whether a [Problem] fails validation.

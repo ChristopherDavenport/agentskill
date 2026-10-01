@@ -5,6 +5,22 @@ All user-visible changes to this library. The format follows
 uses [Semantic Versioning](https://semver.org/); before v1.0.0 minor
 versions may break the API.
 
+## Unreleased
+
+- Added: `Skill.Instructions` returns the text the skill tool serves
+  for a read of a skill's instructions, whose SHA-256 is the
+  `Read.SHA256` the read records. A product can bind an approval to
+  what the model will read without serving the skill through the
+  tool. (#32)
+- Changed: the skill tool reads the skill file at each call rather
+  than serving the body from discovery. A reply used to put that body
+  beside the file list as it is now, a text that had never been on
+  disk. An edited body is now served as it is. A skill file that is
+  gone, renamed, or whose frontmatter differs is refused with the new
+  `ErrSkillChanged` until the product discovers again, since the
+  listing and any grant came from the old frontmatter. `Skill.Body`
+  stays as loaded. (#31)
+
 ## v0.0.9 - 2026-10-01
 
 - Documentation: `docs/source.md` restates the parts of the Agent
