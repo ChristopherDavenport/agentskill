@@ -7,6 +7,10 @@ versions may break the API.
 
 ## Unreleased
 
+- Documentation: `docs/source.md` restates the parts of the Agent
+  Skills specification and client guide this module relies on. It also
+  states what they leave out: a source as three operations, the path
+  rules, and the symlink guard as a MUST for any reader. (#9)
 - Dependencies: agenttool v0.0.11 to v0.0.12, and agentturn v0.0.12 to
   v0.0.13, which is used by the tests alone. No API of this module
   changes with them.
