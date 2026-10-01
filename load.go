@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -71,23 +72,15 @@ func LoadDir(dir string) (*Skill, error) {
 // falls back to probing; there the probed name is the best available.
 func readSkillFile(fsys fs.FS) (string, []byte, error) {
 	if entries, err := fs.ReadDir(fsys, "."); err == nil {
-		present := make(map[string]bool, len(entries))
-		for _, e := range entries {
-			if !e.IsDir() {
-				present[e.Name()] = true
-			}
+		name, ok := listedSkillFile(entries)
+		if !ok {
+			return "", nil, ErrNoSkillFile
 		}
-		for _, name := range skillFiles {
-			if !present[name] {
-				continue
-			}
-			src, err := fs.ReadFile(fsys, name)
-			if err != nil {
-				return "", nil, fmt.Errorf("agentskill: read %s: %w", name, err)
-			}
-			return name, src, nil
+		src, err := fs.ReadFile(fsys, name)
+		if err != nil {
+			return "", nil, fmt.Errorf("agentskill: read %s: %w", name, err)
 		}
-		return "", nil, ErrNoSkillFile
+		return name, src, nil
 	}
 	for _, name := range skillFiles {
 		src, err := fs.ReadFile(fsys, name)
@@ -99,6 +92,32 @@ func readSkillFile(fsys fs.FS) (string, []byte, error) {
 		}
 	}
 	return "", nil, ErrNoSkillFile
+}
+
+// listedSkillFile returns the name of the skill file among a
+// directory's entries, compared exactly and preferring the uppercase
+// spelling, so the answer does not depend on the host's case policy.
+func listedSkillFile(entries []fs.DirEntry) (string, bool) {
+	for _, name := range skillFiles {
+		for _, e := range entries {
+			if !e.IsDir() && e.Name() == name {
+				return name, true
+			}
+		}
+	}
+	return "", false
+}
+
+// misnamedSkillFile returns a file among a directory's entries whose
+// name is SKILL.md in another case than either spelling the format
+// accepts, such as Skill.md.
+func misnamedSkillFile(entries []fs.DirEntry) (string, bool) {
+	for _, e := range entries {
+		if !e.IsDir() && strings.EqualFold(e.Name(), skillFiles[0]) && !slices.Contains(skillFiles, e.Name()) {
+			return e.Name(), true
+		}
+	}
+	return "", false
 }
 
 // joinLocation appends elem to a location with a forward slash, which

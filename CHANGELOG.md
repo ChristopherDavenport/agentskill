@@ -7,6 +7,16 @@ versions may break the API.
 
 ## Unreleased
 
+- Changed: `Discover` finds a skill file by listing the directory and
+  comparing names exactly, as `Load` has since v0.0.3, rather than
+  probing with `fs.Stat`. A directory whose skill file is `Skill.md`,
+  `SKILL.MD` or any other case of `SKILL.md` but the two the format
+  accepts is now skipped on every host. On a case-insensitive file
+  system, macOS's or Windows', it used to come up as a load error
+  keyed under a `SKILL.md` that did not exist, while Linux skipped it
+  silently. Either way it now has a `Warning` in `Catalog.Problems`
+  under the file's real name, saying the file must be named
+  `SKILL.md`. (#11)
 - Fixed: `Skill.Files` lists a symlink only when it stats as a file,
   so the skill tool offers only paths it can serve. Under `Dir`, a link
   leading outside the skill was listed and then refused when read, and
