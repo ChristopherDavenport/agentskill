@@ -20,7 +20,9 @@ type Catalog struct {
 	// [Skill.ShadowedBy] names the skill that holds the name.
 	Shadowed []*Skill
 	// Problems maps a skill's location to what [Skill.Validate]
-	// reported, or to the one error that stopped it loading.
+	// reported, or to the one error that stopped it loading. A
+	// directory skipped for a skill file misnamed in case alone has its
+	// [Warning] under that file's location.
 	Problems map[string][]Problem
 }
 
@@ -31,7 +33,9 @@ type Catalog struct {
 // skill of a taken name is shadowed, unless its source has a
 // [Source.Qualifier], in which case it is listed under the qualified
 // name, and shadowed only if that is taken too. A child without a
-// SKILL.md is not a skill and is skipped.
+// SKILL.md is not a skill and is skipped; one holding a file named
+// SKILL.md in another case, such as Skill.md, is skipped on every host
+// with a [Warning] in Problems under that file's location.
 //
 // A skill [Catalog.Listed] will not offer, for want of a name or a
 // description or for a colon in its name, is kept in Skills but claims no name, so it never
@@ -78,11 +82,15 @@ func Discover(sources ...Source) (*Catalog, error) {
 			if !isDir(src.FS, e) {
 				continue
 			}
-			file, ok := findSkillFile(src.FS, e.Name())
+			location := joinLocation(src.Location, e.Name())
+			file, misnamed, ok := findSkillFile(src.FS, e.Name())
 			if !ok {
+				if misnamed != "" {
+					c.Problems[joinLocation(location, misnamed)] = []Problem{{Severity: Warning, Message: fmt.Sprintf(
+						"Skill file must be named SKILL.md, not %s; the directory is not a skill", misnamed)}}
+				}
 				continue
 			}
-			location := joinLocation(src.Location, e.Name())
 			sub, err := fs.Sub(src.FS, e.Name())
 			if err != nil {
 				c.Problems[joinLocation(location, file)] = []Problem{{Severity: Error, Message: err.Error()}}
@@ -160,14 +168,29 @@ func isDir(fsys fs.FS, e fs.DirEntry) bool {
 }
 
 // findSkillFile returns the name of the skill file in the child
-// directory, preferring the uppercase spelling.
-func findSkillFile(fsys fs.FS, dir string) (string, bool) {
+// directory as its listing spells it, preferring the uppercase spelling.
+// The listing is compared exactly, as [Load] compares it: a probe for
+// SKILL.md finds a Skill.md on a case-insensitive file system and not on
+// a case-sensitive one, so the same tree held a skill on macOS and none
+// on Linux. When there is no skill file, misnamed is a file that would
+// be one but for its case, so Discover can say why the directory is
+// skipped.
+//
+// A child that cannot be listed falls back to probing, as Load does.
+func findSkillFile(fsys fs.FS, dir string) (file, misnamed string, ok bool) {
+	if entries, err := fs.ReadDir(fsys, dir); err == nil {
+		if file, ok := listedSkillFile(entries); ok {
+			return file, "", true
+		}
+		misnamed, _ := misnamedSkillFile(entries)
+		return "", misnamed, false
+	}
 	for _, name := range skillFiles {
 		if info, err := fs.Stat(fsys, dir+"/"+name); err == nil && !info.IsDir() {
-			return name, true
+			return name, "", true
 		}
 	}
-	return "", false
+	return "", "", false
 }
 
 // Listed returns the skills the model is offered, in catalog order:
