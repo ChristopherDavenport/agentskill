@@ -5,6 +5,17 @@ All user-visible changes to this library. The format follows
 uses [Semantic Versioning](https://semver.org/); before v1.0.0 minor
 versions may break the API.
 
+## Unreleased
+
+- Changed: an `ErrSkillChanged` error ends `the host must discover the
+  skills again`, where it ended `discover the skills again`. The skill
+  tool returns it to the model, which cannot discover anything, and the
+  host reads the same text.
+- Dependencies: agentturn v0.0.15 to v0.0.16, which is used by the
+  tests alone, agenttool v0.0.14 to v0.0.15, which agentturn v0.0.16
+  requires, and openresponses v0.0.12 to v0.0.14. No API of this
+  module changes with them.
+
 ## v0.0.10 - 2026-10-01
 
 - Added: `Skill.Instructions` returns the text the skill tool serves
