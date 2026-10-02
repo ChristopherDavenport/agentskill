@@ -272,17 +272,17 @@ func (s *Skill) currentBody() (string, bool, error) {
 	}
 	file, src, err := readSkillFile(s.FS)
 	if errors.Is(err, ErrNoSkillFile) {
-		return "", false, fmt.Errorf("skill %q: %w: %s is gone; discover the skills again", s.ListedName(), ErrSkillChanged, s.Location)
+		return "", false, fmt.Errorf("skill %q: %w: %s is gone; the host must discover the skills again", s.ListedName(), ErrSkillChanged, s.Location)
 	}
 	if err != nil {
 		return "", false, err
 	}
 	if file != s.file {
-		return "", false, fmt.Errorf("skill %q: %w: the skill file is now %s, not %s; discover the skills again", s.ListedName(), ErrSkillChanged, file, s.file)
+		return "", false, fmt.Errorf("skill %q: %w: the skill file is now %s, not %s; the host must discover the skills again", s.ListedName(), ErrSkillChanged, file, s.file)
 	}
 	front, body, err := splitFrontmatter(src)
 	if err != nil {
-		return "", false, fmt.Errorf("skill %q: %w: %s: %w; discover the skills again", s.ListedName(), ErrSkillChanged, s.Location, err)
+		return "", false, fmt.Errorf("skill %q: %w: %s: %w; the host must discover the skills again", s.ListedName(), ErrSkillChanged, s.Location, err)
 	}
 	return body, !bytes.Equal(front, s.front), nil
 }
