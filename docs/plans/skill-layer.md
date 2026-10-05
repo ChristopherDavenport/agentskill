@@ -3,7 +3,7 @@
 The [Agent Skills](https://agentskills.io/specification) format,
 loaded into the model's context. A product built on `agentturn` needs
 it, the agent-layer plan places it outside the loop ("skills or prompt
-context through `Transform`" under *What a product adds*), and the dex
+context through `Transform`" under *What a product adds*), and the dax
 plan buries it in its `prompt/` piece. This module lifts it out so
 every product shares one implementation, the way `agenttool` was
 lifted out of the loop.
@@ -44,7 +44,7 @@ rather than through a local read tool that may not exist.
 ## Non-goals
 
 - Deciding where skills live. The specification does not say, and each
-  product has its own directories (`.claude/skills`, `.dex/skills`, a
+  product has its own directories (`.claude/skills`, `.dax/skills`, a
   home directory) or remote catalogs. The caller passes sources.
 - Fetching. An `fs.FS` over HTTP, an MCP server's resources or an
   object store is a product's or a sibling's adapter; this module
@@ -75,7 +75,7 @@ folded and multi-line scalars that a hand-rolled subset would reject.
 
 The dependency direction is `agentskill -> agenttool -> openresponses`.
 `agentturn` never imports this module; a product wires the two
-together. dex's `prompt/` piece is the first consumer.
+together. dax's `prompt/` piece is the first consumer.
 
 ## Core types
 
@@ -376,7 +376,7 @@ MCP interop is not.
    errors. Then a run under `agentturn` with the `echo` adapter in a
    test that lives here and imports the loop as a test dependency
    only, over an `embed.FS` source so the run touches no disk.
-5. dex's `prompt/` piece consumes this module and `agentsmd`; its
+5. dax's `prompt/` piece consumes this module and `agentsmd`; its
    golden prompt test covers the wiring.
 
 ## Open questions
@@ -411,7 +411,7 @@ Open:
   in the session, most likely an `agentskill:` slug under the config
   entry's extension keys or a `RequestExtra` value, so `agentsession`
   stores it without learning the type. With that, a replay can say
-  "this run had `pdf-processing` at hash `ab12…` from `~/.dex/skills`"
+  "this run had `pdf-processing` at hash `ab12…` from `~/.dax/skills`"
   and an evaluation can group trajectories by skill version. Open
   because it touches the session format: whether the RFC needs a
   named field or the passthrough is enough, and whether the hash

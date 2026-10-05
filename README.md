@@ -14,7 +14,7 @@ model reaches every level of it through one tool rather than through a
 local read tool that may not exist.
 
 ```go
-catalog, err := agentskill.DiscoverDirs(".dex/skills", filepath.Join(home, ".dex", "skills"))
+catalog, err := agentskill.DiscoverDirs(".dax/skills", filepath.Join(home, ".dax", "skills"))
 if err != nil {
 	return err
 }
