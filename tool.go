@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -28,7 +29,8 @@ const DefaultMaxBytes = 1 << 20
 type ToolOption func(*toolOptions)
 
 type toolOptions struct {
-	maxBytes int64
+	maxBytes  int64
+	fileClaim func(ctx context.Context, s *Skill, file string) ([]agenttool.FactCall, error)
 }
 
 // WithMaxBytes sets the largest file the tool returns; a larger one is
@@ -36,6 +38,33 @@ type toolOptions struct {
 // is a worse instruction than none. The default is [DefaultMaxBytes].
 func WithMaxBytes(n int64) ToolOption {
 	return func(o *toolOptions) { o.maxBytes = n }
+}
+
+// WithFileClaim has the skill tool make the facts claim
+// (agenttool.Factual) for each call, naming the file the call would
+// serve, so a product's policy can decide the read before it happens:
+// hold it to the rules of the product's own read tool, say, where a
+// skills directory is a link into the workspace and a skill's file is
+// the workspace's .env.
+//
+// The claim is the call itself followed by the calls fn returns for
+// that file. file is a path inside s.FS: for a read of the skill's
+// instructions, by no path or by "SKILL.md" in any case, the skill file
+// as [Load] read it, and otherwise the path the call names. The claim
+// and the call resolve the skill and the path in one place, so they
+// cannot name different files. The list of files that follows the
+// instructions is not claimed: it names files and serves none.
+//
+// A call the tool will refuse without reading anything, an unknown
+// skill or a path that is not a relative path inside the skill, claims
+// the call itself alone, and fn is not called. So does a read of the
+// instructions of a skill Load did not build, which serves the body it
+// holds and reads no file. An error from fn is the claim's error, which
+// a policy reads as a call it cannot decide.
+//
+// Without this option, or with a nil fn, the tool makes no claim.
+func WithFileClaim(fn func(ctx context.Context, s *Skill, file string) ([]agenttool.FactCall, error)) ToolOption {
+	return func(o *toolOptions) { o.fileClaim = fn }
 }
 
 // RecordNS is the namespace of the session entry a recorder writes for
@@ -122,34 +151,39 @@ type toolArgs struct {
 // the skill, the SKILL.md behind the name and a digest of the bytes
 // served. It implements agenttool.Recordable, so a recorder writes it
 // under [RecordNS]; the model never sees it.
+//
+// Built with [WithFileClaim], the tool claims the file each call would
+// serve, so a product's policy can decide the read before it happens.
 func (c *Catalog) Tool(opts ...ToolOption) agenttool.Tool {
 	o := toolOptions{maxBytes: DefaultMaxBytes}
 	for _, opt := range opts {
 		opt(&o)
 	}
+	var topts []agenttool.Option
+	if o.fileClaim != nil {
+		topts = append(topts, agenttool.WithFacts(func(ctx context.Context, args json.RawMessage) (agenttool.Facts, error) {
+			return c.fileFacts(ctx, args, o.fileClaim)
+		}))
+	}
 	return agenttool.New(ToolName,
 		"Read a skill's instructions, or one of its files. Call with the skill's name for its instructions and the list of its files; call with a name and a path for a file.",
 		func(ctx context.Context, a toolArgs) (agenttool.Result, error) {
-			s, ok := c.Lookup(a.Name)
-			if !ok {
-				return agenttool.Result{}, fmt.Errorf("unknown skill %q; available skills: %s", a.Name, listOrNone(c.Names()))
+			s, p, err := c.target(a)
+			if err != nil {
+				return agenttool.Result{}, err
 			}
 			var (
 				parts  openresponses.Contents
 				served []byte
-				err    error
 			)
-			if isSkillFileName(a.Path) {
-				a.Path = ""
-			}
 			changed := false
-			if a.Path == "" {
+			if p == "" {
 				var text string
 				text, changed, err = s.instructions()
 				served = []byte(text)
 				parts = openresponses.Contents{&openresponses.InputText{Text: text}}
 			} else {
-				parts, served, err = file(s, a.Path, o.maxBytes)
+				parts, served, err = file(s, p, o.maxBytes)
 			}
 			if err != nil {
 				return agenttool.Result{}, err
@@ -159,7 +193,7 @@ func (c *Catalog) Tool(opts ...ToolOption) agenttool.Tool {
 			res.Details = Read{
 				Name:     s.ListedName(),
 				Location: s.Location,
-				Path:     a.Path,
+				Path:     p,
 				Bytes:    len(served),
 				SHA256:   hex.EncodeToString(sum[:]),
 
@@ -167,7 +201,51 @@ func (c *Catalog) Tool(opts ...ToolOption) agenttool.Tool {
 				FrontmatterChanged: changed,
 			}
 			return res, nil
-		})
+		}, topts...)
+}
+
+// target resolves a call of the skill tool to the skill it names and
+// the path it would serve, "" for the skill's instructions. A path
+// naming the skill file is the instructions. It is the one reading of
+// the arguments, which the call and its facts claim both use.
+func (c *Catalog) target(a toolArgs) (*Skill, string, error) {
+	s, ok := c.Lookup(a.Name)
+	if !ok {
+		return nil, "", fmt.Errorf("unknown skill %q; available skills: %s", a.Name, listOrNone(c.Names()))
+	}
+	if a.Path == "" || isSkillFileName(a.Path) {
+		return s, "", nil
+	}
+	if !fs.ValidPath(a.Path) {
+		return nil, "", fmt.Errorf("invalid path %q: must be a relative path inside the skill, as listed", a.Path)
+	}
+	return s, a.Path, nil
+}
+
+// fileFacts is the claim [WithFileClaim] makes for a call with args:
+// the call itself, then what fn says of the file the call would serve.
+// The arguments are decoded as the call decodes them.
+func (c *Catalog) fileFacts(ctx context.Context, args json.RawMessage, fn func(context.Context, *Skill, string) ([]agenttool.FactCall, error)) (agenttool.Facts, error) {
+	calls := []agenttool.FactCall{{Args: args}}
+	a, err := agenttool.Decode[toolArgs](args)
+	if err != nil {
+		return agenttool.Facts{Calls: calls}, nil
+	}
+	s, p, err := c.target(a)
+	if err != nil {
+		return agenttool.Facts{Calls: calls}, nil
+	}
+	if p == "" {
+		if s.file == "" {
+			return agenttool.Facts{Calls: calls}, nil
+		}
+		p = s.file
+	}
+	more, err := fn(ctx, s, p)
+	if err != nil {
+		return agenttool.Facts{}, err
+	}
+	return agenttool.Facts{Calls: append(calls, more...)}, nil
 }
 
 // isSkillFileName reports whether p names the skill file at the root,
@@ -289,10 +367,9 @@ func (s *Skill) currentBody() (string, bool, error) {
 
 // file returns one resource file as text or an image, with the file's
 // own bytes beside the part.
+//
+// name is a valid path, as [Catalog.target] checks.
 func file(s *Skill, name string, maxBytes int64) (openresponses.Contents, []byte, error) {
-	if !fs.ValidPath(name) {
-		return nil, nil, fmt.Errorf("invalid path %q: must be a relative path inside the skill, as listed", name)
-	}
 	info, err := fs.Stat(s.FS, name)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) || errors.Is(err, ErrOutside) {

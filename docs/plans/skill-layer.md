@@ -286,6 +286,16 @@ one tool serves text and images:
   does. It does not hold the frontmatter, so it says nothing of the
   grant: `Skill.FrontmatterSHA256()`, recorded on every `Read`, is the
   digest of the frontmatter as loaded, and an approval binds to both.
+- `WithFileClaim(fn)` makes the tool `agenttool.Factual`, so a
+  product's policy can decide a read before it happens. A skill's
+  tree is wherever its source points, and a project skills directory
+  that links into the workspace serves the workspace's files. The
+  claim is the call itself, then `fn`'s calls for the file the call
+  would serve: the skill file as loaded for the body call, the path
+  otherwise. The claim and the call resolve the name and path through
+  one helper. A call refused before any read, an unknown skill or an
+  invalid path, claims the call alone. The file list is not claimed:
+  it names files and serves none.
 
 Because every activation and every read is a function call, the
 transcript and the session record which skills a run used and which
