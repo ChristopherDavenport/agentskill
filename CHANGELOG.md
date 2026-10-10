@@ -5,7 +5,7 @@ All user-visible changes to this library. The format follows
 uses [Semantic Versioning](https://semver.org/); before v1.0.0 minor
 versions may break the API.
 
-## Unreleased
+## v0.0.12 - 2026-10-09
 
 - Added: `WithFileClaim(fn)` has the skill tool make agenttool's facts
   claim (`agenttool.Factual`), so a product's policy can decide the
