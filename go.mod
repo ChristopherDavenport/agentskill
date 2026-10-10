@@ -3,7 +3,7 @@ module github.com/ChristopherDavenport/agentskill
 go 1.25
 
 require (
-	github.com/ChristopherDavenport/agenttool v0.0.15
+	github.com/ChristopherDavenport/agenttool v0.0.20
 	github.com/ChristopherDavenport/openresponses v0.0.14
 	go.yaml.in/yaml/v3 v3.0.5
 )

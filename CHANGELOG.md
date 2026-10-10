@@ -5,6 +5,21 @@ All user-visible changes to this library. The format follows
 uses [Semantic Versioning](https://semver.org/); before v1.0.0 minor
 versions may break the API.
 
+## Unreleased
+
+- Added: `WithFileClaim(fn)` has the skill tool make agenttool's facts
+  claim (`agenttool.Factual`), so a product's policy can decide the
+  read before it happens. The claim for a call is the call itself,
+  followed by the calls `fn` returns for the file the call would
+  serve: the skill file as loaded for a read of the instructions, the
+  path otherwise. The claim and the call resolve the skill and the
+  path in one place, so they name the same file. An unknown skill or
+  an invalid path claims the call itself alone, and an error from `fn`
+  is the claim's error. Without the option the tool makes no claim, as
+  before. (#40)
+- Dependencies: agenttool v0.0.15 to v0.0.20, for the facts claim
+  (`agenttool.Factual`, `FactCall` and `WithFacts`, added in v0.0.19).
+
 ## v0.0.11 - 2026-10-02
 
 - Changed: an `ErrSkillChanged` error ends `the host must discover the

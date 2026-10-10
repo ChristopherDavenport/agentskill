@@ -50,6 +50,20 @@ tool reads the skill file at each call, so an edited body is served
 as it now is. Edited frontmatter takes effect only when the product
 discovers again; until then the read says the catalogue is stale.
 
+The tool reads any file in a skill's tree, and a skill's tree is
+wherever its source points: a project's skills directory that links
+into the workspace makes the workspace's `.env` a skill file. A
+product that holds such reads to its own rules builds the tool with
+`WithFileClaim(fn)`. The tool then makes agenttool's facts claim
+(`agenttool.Factual`), and a policy can decide the read before it
+happens. The claim for a call is the call itself, followed by what `fn`
+returns for the file the call would serve. That file is the skill file
+as loaded for a read of the instructions, and the path otherwise. The
+claim and the call resolve the skill and the path in one place, so the
+file claimed is the file served. A call the tool refuses before
+reading anything, an unknown skill or an invalid path, claims the call
+itself alone. `agenttool.Wrap` forwards the claim.
+
 ## Skills
 
 - `Load(fsys, location)` reads the `SKILL.md` at the root of any
